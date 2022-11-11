@@ -1,10 +1,5 @@
 (ns generate-test.cross.endpoint-routes
-  (:require
-
-   #_donut:endpoint-namespaces
-   ))
+  (:require))
 
 (def routes
-  [
-   #_donut:routes
-   ])
+  [])

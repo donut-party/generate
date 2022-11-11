@@ -2,9 +2,10 @@
   (:require
    [clojure.java.shell :as sh]
    [clojure.test :refer [deftest is]]
-   [donut.generate :as dg]))
+   [donut.generate :as dg]
+   [rewrite-clj.zip :as rz]))
 
-(deftest destination-parser
+(deftest destination-parser-test
   (is (= {:destination {:path "src/my/project/cross/endpoint_routes.cljc"}
           :data        {:top 'my.project}}
          (-> {:destination {:path "{{top/file}}/cross/endpoint_routes.cljc"
@@ -21,6 +22,16 @@
              (#'dg/parse-destination)))))
 
 
+(deftest rewrite-find-path-test
+  (is (= '(:require)
+         (-> (rz/of-string "(ns foo (:require))")
+             (dg/find-path '[ns :require])
+             (rz/sexpr))))
+
+  (is (= []
+         (-> (rz/of-string "(ns foo (:require []))")
+             (dg/find-path ['ns :require vector?])
+             (rz/sexpr)))))
 ;; testing an actual generator
 
 (defmethod dg/generator-points :donut/endpoint
@@ -41,14 +52,14 @@
       ;; update the routes namespaces
       {:destination {:path    "{{top/file}}/cross/endpoint_routes.cljc"
                      :dir     "test-generated-files"
-                     :rewrite {:path   ['ns :donut.generate.nav/up :require :donut.generate.nav/up]
+                     :rewrite {:path   ['ns :require]
                                :action :append-child}}
        :content     {:form [endpoint-ns :as endpoint-name]}}
 
       ;; update the routes
       {:destination {:path    "{{top/file}}/cross/endpoint_routes.cljc"
                      :dir     "test-generated-files"
-                     :rewrite {:path   ['routes :donut.generate.nav/up]
+                     :rewrite {:path   ['routes vector?]
                                :action :append-child}}
        :content     {:template "[\"{{route-prefix}}/{{endpoint-name}}\"
    {:name     {{endpoint-name-kw}}
@@ -70,7 +81,17 @@
     (dg/generate :donut/endpoint {:endpoint-name 'users
                                   :top           "generate-test"})
 
-    (is (= ""
+    (is (= "(ns generate-test.cross.endpoint-routes
+  (:require [generate-test.backend.endpoint.users-endpoint :as users]))
+
+(def routes
+  [[\"{{route-prefix}}/users\"
+   {:name     :users
+    :ent-type :users
+    :id-key   :users/id}
+   #?(:clj users/collection-handlers)]])
+"
            (slurp (str output-directory "/generate_test/cross/endpoint_routes.cljc"))))
-    (is (= ""
+    (is (= "(ns generate-test.backend.endpoint.users-endpoint)
+;; content goes here"
            (slurp (str output-directory "/generate_test/backend/endpoint/users_endpoint.clj"))))))

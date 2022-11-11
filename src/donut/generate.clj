@@ -4,7 +4,6 @@
    [clojure.walk :as walk]
    [clojure.string :as str]
    [rewrite-clj.custom-zipper.core :as rcz]
-   [rewrite-clj.custom-zipper.utils :as rcu]
    [rewrite-clj.zip :as rz]
    [rewrite-clj.zip.whitespace :as rzw]))
 
@@ -16,44 +15,48 @@
   [point]
   (get-in point [:destination :path]))
 
+;;---
 ;; rewriting
+;;---
 
-(defn find-anchor
-  [loc anchor]
-  (rz/up (rz/find-value loc rz/next anchor)))
+(defn find-value-parent
+  [loc value]
+  (rz/up (rz/find-value loc rz/next value)))
 
-
-(def navs
-  {:left      rz/left
-   :right     rz/right
-   :up        rz/up
-   :down      rz/down
-   :prev      rz/prev
-   :next      rz/next
-   :leftmost  rz/leftmost
-   :rightmost rz/rightmost})
+(def nav-substitutions
+  {::left      rz/left
+   ::right     rz/right
+   ::up        rz/up
+   ::down      rz/down
+   ::prev      rz/prev
+   ::next      rz/next
+   ::leftmost  rz/leftmost
+   ::rightmost rz/rightmost
+   map?        rz/map?
+   list?       rz/list?
+   seq?        rz/seq?
+   set?        rz/set?
+   vector?     rz/vector?})
 
 (def actions
   {:append-child rz/append-child})
 
-(defn find-nav
-  [loc nav]
-  (reduce (fn [loc nav-item]
-            (if (and (keyword? nav-item)
-                     (= "donut.generate.nav" (namespace nav-item)))
-              ((get navs (keyword (name nav-item))) loc)
-              (rz/find loc rz/next (if-not (fn? nav-item)
-                                     #(= (rz/sexpr %) nav-item)
-                                     nav-item))))
-          loc
-          nav))
+(defn find-path
+  [loc path]
+  (let [path (map (fn [x] (get nav-substitutions x x)) path)]
+    (reduce (fn [loc nav-item]
+              (if (fn? nav-item)
+                (rz/find loc rz/next nav-item)
+                (find-value-parent loc nav-item)))
+            loc
+            path)))
 
 (defn insert-below-anchor
   [loc anchor form]
   ;; need to use rz/up because "anchors" exist in source as forms like
   ;; `#_pref:name`. we're finding the value `pref:name`, which exists in a
   ;; comment node, so we need to navigate up to the comment node
-  (if-let [anchor-loc (find-anchor loc anchor)]
+  (if-let [anchor-loc (find-value-parent loc anchor)]
     (let [left-node  (rz/node (rcz/left anchor-loc))
           whitespace (and (:whitespace left-node) left-node)]
       (-> anchor-loc
@@ -69,7 +72,7 @@
 
 (defn insert-at-path
   [loc path action form]
-  ((action actions) (find-nav loc path) form))
+  ((action actions) (find-path loc path) form))
 
 (defn write-node
   [loc {:keys [content] :as point}]
@@ -86,10 +89,8 @@
 ;; point writers
 ;;------
 
-
-(defn write-anchor-point
+(defn rewrite-point
   [point]
-  (prn "write anchor point")
   (let [file-path (point-path point)]
     (spit file-path (-> file-path
                         rz/of-file
@@ -106,7 +107,7 @@
 (defn write-point
   [{:keys [destination] :as point}]
   (if (:rewrite destination)
-    (write-anchor-point point)
+    (rewrite-point point)
     (write-file-point point)))
 
 ;;------
@@ -128,10 +129,6 @@
 {:destination {:namespace "{{top/ns}}.cross.endpoint-routes"
                :anchor 'st:begin-ns-routes}
  :content     "..."}
-
-;;---
-;; NEW STUFF
-;;---
 
 (defn ->ns
   "Given a string or symbol, presumably representing a
