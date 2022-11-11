@@ -1,8 +1,7 @@
 (ns donut.generate
   "Write code generators that can be executed from the REPL"
   (:require
-   [cljstache.core :as cs]
-   [clojure.spec.alpha :as s]
+   [clojure.walk :as walk]
    [clojure.string :as str]
    [rewrite-clj.custom-zipper.core :as rcz]
    [rewrite-clj.custom-zipper.utils :as rcu]
@@ -22,8 +21,8 @@
                     path)))
 
 (defn point-path
-  [point opts]
-  (str/join java.io.File/separator (point-path-segments point opts)))
+  [point]
+  (get-in point [:destination :path]))
 
 ;; rewriting
 
@@ -64,89 +63,38 @@
   (clear-right (find-anchor loc anchor)))
 
 ;;------
-;; point generators
+;; point writers
 ;;------
 
-;; specs
 
-(s/def ::path (s/or :path-segments (s/coll-of string?)
-                    :path-fn fn?))
-(s/def ::strategy keyword?)
-(s/def ::rewrite fn?)
-(s/def ::template string?)
+(defn write-anchor-point
+  [{:keys [content anchor] :as point}]
+  (let [file-path (point-path point)]
+    (spit file-path (-> file-path
+                        rz/of-file
+                        (insert-below-anchor anchor content)
+                        rz/root-string))))
 
-(defmulti generate-point-type :strategy)
+(defn write-file-point
+  [{:keys [content] :as point}]
+  (prn "POIT PATH" (get-in point [:destination :path]))
+  (let [file-path (point-path point)]
+    (.mkdirs (java.io.File. (.getParent (java.io.File. file-path))))
+    (spit file-path content)))
 
-(defmethod generate-point-type ::rewrite-file [_]
-  (s/keys :req-un [::path ::rewrite ::strategy]))
-
-(defmethod generate-point-type ::create-file [_]
-  (s/keys :req-un [::path ::template ::strategy]))
-
-(s/def ::point (s/multi-spec generate-point-type :strategy))
-(s/def ::points (s/map-of keyword? ::point))
-
-;; methods
-
-(defmulti generate-point (fn [{:keys [strategy]} _opts] strategy))
-
-(defmethod generate-point ::rewrite-file
-  [{:keys [rewrite] :as point} opts]
-  (let [file-path (point-path point opts)]
-    (spit file-path (rz/root-string (rewrite (rz/of-file file-path) opts)))))
-
-(defmethod generate-point ::create-file
-  [{:keys [template] :as point} opts]
-  (let [file-path (point-path point opts)]
-    (.mkdirs (java.io.File. (str/join "/" (butlast (point-path-segments point opts)))))
-    (spit file-path (cs/render template opts))))
+(defn write-point
+  [{:keys [destination] :as point}]
+  (if (:anchor destination)
+    (write-anchor-point point)
+    (write-file-point point)))
 
 ;;------
 ;; generators
 ;;------
 
 ;; specs
+(defmulti generator-points (fn [generator-name _data] generator-name))
 
-(s/def ::generator-name keyword?)
-(s/def ::generator-point-names (s/coll-of keyword?))
-(s/def ::generator-pair (s/tuple ::generator-name ::generator-point-names))
-(s/def ::opts fn?)
-(s/def ::generator (s/keys :req-un [::points]
-                           :opt-un [::opts]))
-
-(s/def ::generator*-arg (s/or :generator-name ::generator-name
-                              :generator-pair ::generator-pair
-                              :generator      ::generator))
-
-;; methods / fns
-
-(defmulti generator identity)
-
-(defn generator*
-  [pkg]
-  (let [conformed (s/conform ::generator*-arg pkg)]
-    (when (= :clojure.spec.alpha/invalid conformed)
-      (throw (ex-info "Invalid generator" {:generator pkg
-                                           :spec    (s/explain-data ::generator*-arg pkg)})))
-    (let [[ptype] conformed]
-      (case ptype
-        :generator-name (generator pkg)
-        :generator-pair (update (generator (first pkg)) select-keys (second pkg))
-        :generator      pkg))))
-
-;;------
-;; generate
-;;------
-(defn generate
-  [generator & args]
-  (let [{:keys [opts points]} (generator* generator)
-        opts                  ((or opts identity) args)]
-    (doseq [point (vals points)]
-      (generate-point point opts))))
-
-
-(defn generate
-  [generator-name generator-data])
 
 {:destination {:path   "{{top/file}}/backend/endpoint_routes.cljc"
                :anchor 'st:begin-ns-routes}
@@ -154,24 +102,24 @@
 
 {:destination {:namespace "{{top/ns}}.backend.endpoint.{{endpoint-name}}"
                :anchor    'st:begin-ns-routes}
- :content     {:form [:foo :bar]}}
+ :content     [:foo :bar]}
 
 {:destination {:namespace "{{top/ns}}.cross.endpoint-routes"
                :anchor 'st:begin-ns-routes}
- :content     {:template "..."}}
+ :content     "..."}
 
 ;;---
 ;; NEW STUFF
 ;;---
 
-(defn- ->ns
+(defn ->ns
   "Given a string or symbol, presumably representing a
   file path, return a string that represents the
   equivalent namespace."
   [f]
   (-> f (str) (str/replace "/" ".") (str/replace "_" "-")))
 
-(defn- ->file
+(defn ->file
   "Given a string or symbol, presumably representing a
   namespace, return a string that represents the
   equivalent file system path."
@@ -202,30 +150,55 @@
   [s data]
   (reduce (fn [s [from to]] (str/replace s from to)) s data))
 
-(defn parse-destination-namespace
-  [{:keys [namespace target-dir extension]} subst-map]
-  (substitute (str (when target-dir (str target-dir "/"))
-                   (->file (substitute namespace subst-map))
-                   (when extension (str "." extension)))
-              subst-map))
+(defn- parse-destination-namespace
+  [{:keys [namespace dir extension]}]
+  (str (when dir (str dir "/"))
+       (->file namespace)
+       (when extension (str "." extension))))
 
-(defn parse-destination-path
-  [{:keys [path target-dir]} subst-map]
-  (substitute (cond->> path
-                target-dir (str target-dir "/"))
-              subst-map))
+(defn- parse-destination-path
+  [{:keys [path dir]}]
+  (str (when dir (str dir "/"))
+       path))
 
-(defn parse-destination
+(defn- substitute-all
+  [m data]
+  (let [subst-map (->subst-map data)]
+    (walk/postwalk #(if (string? %) (substitute % subst-map) %)
+                   m)))
+
+(defn- parse-destination
   [{:keys [destination data] :as spec}]
-  (let [{:keys [path namespace anchor]} destination
-        subst-map                       (->subst-map data)]
+  (let [destination                     (substitute-all destination data)
+        {:keys [path namespace anchor]} destination]
     (when (and path namespace)
       (throw (ex-info "You can only specify one of :path or :namespace for a :destination"
                       {:path path, :namespace namespace})))
 
     (assoc spec :destination (cond-> {}
-                               path      (assoc :path (parse-destination-path destination subst-map))
-                               namespace (assoc :path (parse-destination-namespace destination subst-map))
+                               path      (assoc :path (parse-destination-path destination))
+                               namespace (assoc :path (parse-destination-namespace destination))
                                anchor    (assoc :anchor anchor)))))
 
-(generate :donut/endpoint {:endpoint-name 'my.endpoint})
+(def GeneratorPoint
+  [:map
+   [:destination {:optional? false}
+    [:map
+     [:path string?]
+     [:namespace]
+     [:extension]
+     [:dir {:optional? true} string?]]]
+   [:content {:optional? false}]
+   [:data {:optional? false} map?]])
+
+(defn generate
+  [generator-name data]
+  (let [{points         :points
+         generator-data :data} (generator-points generator-name data)]
+    (doseq [point points]
+      (write-point (-> point
+                       (update :data merge generator-data data)
+                       parse-destination)))))
+
+(comment
+  (generate :donut/endpoint {:endpoint-name 'my.endpoint}))
