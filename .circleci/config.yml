@@ -8,11 +8,8 @@ jobs:
     steps:
       - checkout
       - run:
-          name: test clj
-          command: clojure -X:test
-      - run:
           name: Build
-          command: clojure -T:build jar
+          command: clojure -T:build ci
       - save-cache:
           paths:
             - ~/bin
