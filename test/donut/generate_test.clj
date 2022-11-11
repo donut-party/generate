@@ -34,25 +34,27 @@
       {:destination {:namespace "{{endpoint-ns}}"
                      :extension "clj"
                      :dir       "test-generated-files"}
-       :content     "(ns {{endpoint-ns}})
-;; content goes here"
+       :content     {:template "(ns {{endpoint-ns}})
+;; content goes here"}
        }
 
       ;; update the routes namespaces
-      {:destination {:path   "{{top/file}}/cross/endpoint_routes.cljc"
-                     :dir    "test-generated-files"
-                     :anchor 'donut:endpoint-namespaces}
-       :content     [endpoint-ns :as endpoint-name]}
+      {:destination {:path    "{{top/file}}/cross/endpoint_routes.cljc"
+                     :dir     "test-generated-files"
+                     :rewrite {:path   ['ns :donut.generate.nav/up :require :donut.generate.nav/up]
+                               :action :append-child}}
+       :content     {:form [endpoint-ns :as endpoint-name]}}
 
       ;; update the routes
-      {:destination {:path   "{{top/file}}/cross/endpoint_routes.cljc"
-                     :dir    "test-generated-files"
-                     :anchor 'donut:routes}
-       :content     "[\"{{route-prefix}}/{{endpoint-name}}\"
-{:name     {{endpoint-name-kw}}
- :ent-type {{endpoint-name-kw}}
- :id-key   {{endpoint-name-kw}}/id}
-#?(:clj {{endpoint-name}}/collection-handlers)]"}]
+      {:destination {:path    "{{top/file}}/cross/endpoint_routes.cljc"
+                     :dir     "test-generated-files"
+                     :rewrite {:path   ['routes :donut.generate.nav/up]
+                               :action :append-child}}
+       :content     {:template "[\"{{route-prefix}}/{{endpoint-name}}\"
+   {:name     {{endpoint-name-kw}}
+    :ent-type {{endpoint-name-kw}}
+    :id-key   {{endpoint-name-kw}}/id}
+   #?(:clj {{endpoint-name}}/collection-handlers)]"}}]
 
      :data-schema [:map
                    [:endpoint-name {:optional? false}]]

@@ -12,14 +12,6 @@
 ;; generator helpers
 ;;------
 
-;; paths TODO this isn't that great
-(defn point-path-segments
-  [{:keys [path]} {:keys [path-base] :as opts
-                   :or {path-base []}}]
-  (into path-base (if (fn? path)
-                    (path opts)
-                    path)))
-
 (defn point-path
   [point]
   (get-in point [:destination :path]))
@@ -29,6 +21,32 @@
 (defn find-anchor
   [loc anchor]
   (rz/up (rz/find-value loc rz/next anchor)))
+
+
+(def navs
+  {:left      rz/left
+   :right     rz/right
+   :up        rz/up
+   :down      rz/down
+   :prev      rz/prev
+   :next      rz/next
+   :leftmost  rz/leftmost
+   :rightmost rz/rightmost})
+
+(def actions
+  {:append-child rz/append-child})
+
+(defn find-nav
+  [loc nav]
+  (reduce (fn [loc nav-item]
+            (if (and (keyword? nav-item)
+                     (= "donut.generate.nav" (namespace nav-item)))
+              ((get navs (keyword (name nav-item))) loc)
+              (rz/find loc rz/next (if-not (fn? nav-item)
+                                     #(= (rz/sexpr %) nav-item)
+                                     nav-item))))
+          loc
+          nav))
 
 (defn insert-below-anchor
   [loc anchor form]
@@ -49,19 +67,20 @@
           (rcz/left)))
     (throw (ex-info "Could not find anchor node" {:anchor anchor}))))
 
-(defn insert-forms-below-anchor
-  [loc anchor forms]
-  (reduce (fn [node form]
-            (insert-below-anchor node anchor form))
-          loc
-          (reverse forms)))
+(defn insert-at-path
+  [loc path action form]
+  ((action actions) (find-nav loc path) form))
 
-(defn clear-right [loc]
-  (rcu/remove-right-while loc (constantly true)))
-
-(defn clear-right-anchor
-  [loc anchor]
-  (clear-right (find-anchor loc anchor)))
+(defn write-node
+  [loc {:keys [content] :as point}]
+  (let [{:keys [template form]}      content
+        {:keys [path action anchor]} (get-in point [:destination :rewrite])
+        node-to-insert               (if template
+                                       (rz/node (rz/of-string template))
+                                       form)]
+    (if anchor
+      (insert-below-anchor loc anchor node-to-insert)
+      (insert-at-path loc path action node-to-insert))))
 
 ;;------
 ;; point writers
@@ -69,23 +88,24 @@
 
 
 (defn write-anchor-point
-  [{:keys [content destination] :as point}]
+  [point]
+  (prn "write anchor point")
   (let [file-path (point-path point)]
     (spit file-path (-> file-path
                         rz/of-file
-                        (insert-below-anchor (:anchor destination) content)
+                        (write-node point)
                         rz/root-string))))
 
 (defn write-file-point
   [{:keys [content] :as point}]
-  (prn "POIT PATH" (get-in point [:destination :path]))
-  (let [file-path (point-path point)]
+  (let [file-path               (point-path point)
+        {:keys [template form]} content]
     (.mkdirs (java.io.File. (.getParent (java.io.File. file-path))))
-    (spit file-path content)))
+    (spit file-path (if template template (str form)))))
 
 (defn write-point
   [{:keys [destination] :as point}]
-  (if (:anchor destination)
+  (if (:rewrite destination)
     (write-anchor-point point)
     (write-file-point point)))
 
@@ -170,7 +190,7 @@
 
 (defn- parse-destination
   [{:keys [destination] :as spec}]
-  (let [{:keys [path namespace anchor]} destination]
+  (let [{:keys [path namespace rewrite]} destination]
     (when (and path namespace)
       (throw (ex-info "You can only specify one of :path or :namespace for a :destination"
                       {:path path, :namespace namespace})))
@@ -178,7 +198,7 @@
     (assoc spec :destination (cond-> {}
                                path      (assoc :path (parse-destination-path destination))
                                namespace (assoc :path (parse-destination-namespace destination))
-                               anchor    (assoc :anchor anchor)))))
+                               rewrite   (assoc :rewrite rewrite)))))
 
 (def GeneratorPoint
   [:map
