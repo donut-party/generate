@@ -7,16 +7,18 @@
 (deftest destination-parser
   (is (= {:destination {:path "src/my/project/cross/endpoint_routes.cljc"}
           :data        {:top 'my.project}}
-         (#'dg/parse-destination
-          {:destination {:path "{{top/file}}/cross/endpoint_routes.cljc"
-                         :dir  "src"}
-           :data        {:top 'my.project}})
+         (-> {:destination {:path "{{top/file}}/cross/endpoint_routes.cljc"
+                            :dir  "src"}
+              :data        {:top 'my.project}}
+             (#'dg/substitute-all)
+             (#'dg/parse-destination))
 
-         (#'dg/parse-destination
-          {:destination {:namespace "{{top/ns}}.cross.endpoint-routes"
-                         :extension "cljc"
-                         :dir       "src"}
-           :data        {:top 'my.project}}))))
+         (-> {:destination {:namespace "{{top/ns}}.cross.endpoint-routes"
+                            :extension "cljc"
+                            :dir       "src"}
+              :data        {:top 'my.project}}
+             (#'dg/substitute-all)
+             (#'dg/parse-destination)))))
 
 
 ;; testing an actual generator
@@ -37,15 +39,15 @@
        }
 
       ;; update the routes namespaces
-      {:destination {:namespace "{{top/file}}/cross/endpoint_routes.cljc"
-                     :dir       "test-generated-files"
-                     :anchor    'donut:endpoint-namespaces}
+      {:destination {:path   "{{top/file}}/cross/endpoint_routes.cljc"
+                     :dir    "test-generated-files"
+                     :anchor 'donut:endpoint-namespaces}
        :content     [endpoint-ns :as endpoint-name]}
 
       ;; update the routes
-      {:destination {:namespace "{{top/file}}/cross/endpoint_routes.cljc"
-                     :dir       "test-generated-files"
-                     :anchor    'donut:routes}
+      {:destination {:path   "{{top/file}}/cross/endpoint_routes.cljc"
+                     :dir    "test-generated-files"
+                     :anchor 'donut:routes}
        :content     "[\"{{route-prefix}}/{{endpoint-name}}\"
 {:name     {{endpoint-name-kw}}
  :ent-type {{endpoint-name-kw}}
@@ -63,9 +65,10 @@
         source-directory  (str current-directory "/resources/test-generated-files")]
     (sh/sh "rm" "-rf" output-directory)
     (sh/sh "cp" "-r" source-directory output-directory)
-    (dg/generate :donut/endpoint {:endpoint-name 'users})
+    (dg/generate :donut/endpoint {:endpoint-name 'users
+                                  :top           "generate-test"})
 
     (is (= ""
            (slurp (str output-directory "/generate_test/cross/endpoint_routes.cljc"))))
     (is (= ""
-           (slurp (str output-directory "/generate_test/backend/endpoint/users.clj"))))))
+           (slurp (str output-directory "/generate_test/backend/endpoint/users_endpoint.clj"))))))

@@ -35,18 +35,19 @@
   ;; need to use rz/up because "anchors" exist in source as forms like
   ;; `#_pref:name`. we're finding the value `pref:name`, which exists in a
   ;; comment node, so we need to navigate up to the comment node
-  (let [anchor-loc (find-anchor loc anchor)
-        left-node  (rz/node (rcz/left anchor-loc))
-        whitespace (and (:whitespace left-node) left-node)]
-    (-> anchor-loc
-        (rcz/insert-right form)
-        (rz/right)
-        (rzw/insert-newline-left)
-        (rcz/insert-left whitespace)
-        ;; navigate back to anchor
-        (rcz/left)
-        (rcz/left)
-        (rcz/left))))
+  (if-let [anchor-loc (find-anchor loc anchor)]
+    (let [left-node  (rz/node (rcz/left anchor-loc))
+          whitespace (and (:whitespace left-node) left-node)]
+      (-> anchor-loc
+          (rcz/insert-right form)
+          (rz/right)
+          (rzw/insert-newline-left)
+          (rcz/insert-left whitespace)
+          ;; navigate back to anchor
+          (rcz/left)
+          (rcz/left)
+          (rcz/left)))
+    (throw (ex-info "Could not find anchor node" {:anchor anchor}))))
 
 (defn insert-forms-below-anchor
   [loc anchor forms]
@@ -68,11 +69,11 @@
 
 
 (defn write-anchor-point
-  [{:keys [content anchor] :as point}]
+  [{:keys [content destination] :as point}]
   (let [file-path (point-path point)]
     (spit file-path (-> file-path
                         rz/of-file
-                        (insert-below-anchor anchor content)
+                        (insert-below-anchor (:anchor destination) content)
                         rz/root-string))))
 
 (defn write-file-point
@@ -162,15 +163,14 @@
        path))
 
 (defn- substitute-all
-  [m data]
+  [{:keys [data] :as m}]
   (let [subst-map (->subst-map data)]
     (walk/postwalk #(if (string? %) (substitute % subst-map) %)
                    m)))
 
 (defn- parse-destination
-  [{:keys [destination data] :as spec}]
-  (let [destination                     (substitute-all destination data)
-        {:keys [path namespace anchor]} destination]
+  [{:keys [destination] :as spec}]
+  (let [{:keys [path namespace anchor]} destination]
     (when (and path namespace)
       (throw (ex-info "You can only specify one of :path or :namespace for a :destination"
                       {:path path, :namespace namespace})))
@@ -198,6 +198,7 @@
     (doseq [point points]
       (write-point (-> point
                        (update :data merge generator-data data)
+                       substitute-all
                        parse-destination)))))
 
 (comment
