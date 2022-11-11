@@ -4,6 +4,7 @@
    [clojure.walk :as walk]
    [clojure.string :as str]
    [rewrite-clj.custom-zipper.core :as rcz]
+   [rewrite-clj.node.whitespace :as rnw]
    [rewrite-clj.zip :as rz]
    [rewrite-clj.zip.whitespace :as rzw]))
 
@@ -38,8 +39,9 @@
    set?        rz/set?
    vector?     rz/vector?})
 
-(def actions
-  {:append-child rz/append-child})
+(def actions-map
+  {:append-child   rz/append-child
+   :append-newline (fn [loc _] (rz/append-child loc (rnw/newlines 1)))})
 
 (defn find-path
   [loc path]
@@ -71,19 +73,22 @@
     (throw (ex-info "Could not find anchor node" {:anchor anchor}))))
 
 (defn insert-at-path
-  [loc path action form]
-  ((action actions) (find-path loc path) form))
+  [loc path actions form]
+  (reduce (fn [loc action]
+            ((action actions-map) loc form))
+          (find-path loc path)
+          actions))
 
 (defn write-node
   [loc {:keys [content] :as point}]
-  (let [{:keys [template form]}      content
-        {:keys [path action anchor]} (get-in point [:destination :rewrite])
-        node-to-insert               (if template
-                                       (rz/node (rz/of-string template))
-                                       form)]
+  (let [{:keys [template form]}       content
+        {:keys [path actions anchor]} (get-in point [:destination :rewrite])
+        node-to-insert                (if template
+                                        (rz/node (rz/of-string template))
+                                        form)]
     (if anchor
       (insert-below-anchor loc anchor node-to-insert)
-      (insert-at-path loc path action node-to-insert))))
+      (insert-at-path loc path actions node-to-insert))))
 
 ;;------
 ;; point writers
