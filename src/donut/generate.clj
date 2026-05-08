@@ -125,15 +125,15 @@
 (defmulti generator-config (fn [generator-name _data] generator-name))
 
 (comment
-  {:destination {:path   "{{top/file}}/backend/endpoint_routes.cljc"
+  {:destination {:path   "{{top|file}}/backend/endpoint_routes.cljc"
                  :anchor 'st:begin-ns-routes}
    :data        {}}
 
-  {:destination {:namespace "{{top/ns}}.backend.endpoint.{{endpoint-name}}"
+  {:destination {:namespace "{{top|ns}}.backend.endpoint.{{endpoint-name}}"
                  :anchor    'st:begin-ns-routes}
    :content     [:foo :bar]}
 
-  {:destination {:namespace "{{top/ns}}.cross.endpoint-routes"
+  {:destination {:namespace "{{top|ns}}.cross.endpoint-routes"
                  :anchor 'st:begin-ns-routes}
    :content     "..."})
 
@@ -152,8 +152,8 @@
 (defn ->subst-map
   "Given a hash map of substitution data, return a hash map of string
   substitutions, suitable for `tools.build.api/copy-dir`. For any unqualified
-  keys that have string or symbol values, compute a `/ns` version that could be
-  used as a namespace and a `/file` version that could be used as a filename.
+  keys that have string or symbol values, compute a `|ns` version that could be
+  used as a namespace and a `|file` version that could be used as a filename.
   These are done fairly simply as seen above."
   [substitutions]
   (reduce-kv (fn [m k v]
@@ -161,16 +161,16 @@
                      s (str (when n (str n "/")) (name k))]
                  (cond-> (assoc m (str "{{" s "}}") (str v))
                    (and (nil? n) (or (string? v) (symbol? v)))
-                   (assoc (str "{{" s "/ns}}")   (->ns   v)
-                          (str "{{" s "/file}}") (->file v)))))
+                   (assoc (str "{{" s "|ns}}")   (->ns   v)
+                          (str "{{" s "|file}}") (->file v)))))
              {}
              substitutions))
 
-(defn- substitute
+(defn- render-template
   "Given a string and a substitution hash map, return the string with all
   substitutions performed."
-  [s substitutions]
-  (reduce (fn [s [from to]] (str/replace s from to)) s substitutions))
+  [template subst-map]
+  (reduce (fn [s [from to]] (str/replace s from to)) template subst-map))
 
 (defn- render-destination-namespace
   [{:keys [namespace dir extension]}]
@@ -187,7 +187,10 @@
   "performs string substitutions on all string values in :data map"
   [{:keys [data] :as point}]
   (let [subst-map (->subst-map data)]
-    (walk/postwalk #(if (string? %) (substitute % subst-map) %)
+    (walk/postwalk (fn [x]
+                     (if (string? x)
+                       (render-template x subst-map)
+                       x))
                    point)))
 
 (defn- render-destination-values

@@ -8,13 +8,13 @@
 (deftest destination-parser-test
   (is (= {:destination {:path "src/my/project/cross/endpoint_routes.cljc"}
           :data        {:top 'my.project}}
-         (-> {:destination {:path "{{top/file}}/cross/endpoint_routes.cljc"
+         (-> {:destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
                             :dir  "src"}
               :data        {:top 'my.project}}
              (#'dg/render-data-values)
              (#'dg/render-destination-values))
 
-         (-> {:destination {:namespace "{{top/ns}}.cross.endpoint-routes"
+         (-> {:destination {:namespace "{{top|ns}}.cross.endpoint-routes"
                             :extension "cljc"
                             :dir       "src"}
               :data        {:top 'my.project}}
@@ -51,14 +51,14 @@
        }
 
       ;; update the routes namespaces
-      {:destination {:path    "{{top/file}}/cross/endpoint_routes.cljc"
+      {:destination {:path    "{{top|file}}/cross/endpoint_routes.cljc"
                      :dir     "test-generated-files"
                      :rewrite {:path    ['ns :require]
                                :actions [:append-child]}}
        :content     {:form [endpoint-ns :as endpoint-name]}}
 
       ;; update the routes
-      {:destination {:path    "{{top/file}}/cross/endpoint_routes.cljc"
+      {:destination {:path    "{{top|file}}/cross/endpoint_routes.cljc"
                      :dir     "test-generated-files"
                      :rewrite {:path    ['routes vector?]
                                :actions [:append-child]}}
