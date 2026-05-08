@@ -32,6 +32,7 @@
          (-> (rz/of-string "(ns foo (:require []))")
              (dg/find-path ['ns :require vector?])
              (rz/sexpr)))))
+;; 
 ;; testing an actual generator
 
 (defmethod dg/generator-points :donut/endpoint

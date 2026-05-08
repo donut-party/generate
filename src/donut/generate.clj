@@ -54,6 +54,8 @@
             path)))
 
 (defn insert-below-anchor
+  "Adds a form below an \"anchor\", where an anchor is something like
+  #_group:name"
   [loc anchor form]
   ;; need to use rz/up because "anchors" exist in source as forms like
   ;; `#_pref:name`. we're finding the value `pref:name`, which exists in a
@@ -122,40 +124,37 @@
 ;; specs
 (defmulti generator-points (fn [generator-name _data] generator-name))
 
+(comment
+  {:destination {:path   "{{top/file}}/backend/endpoint_routes.cljc"
+                 :anchor 'st:begin-ns-routes}
+   :data        {}}
 
-{:destination {:path   "{{top/file}}/backend/endpoint_routes.cljc"
-               :anchor 'st:begin-ns-routes}
- :data        {}}
+  {:destination {:namespace "{{top/ns}}.backend.endpoint.{{endpoint-name}}"
+                 :anchor    'st:begin-ns-routes}
+   :content     [:foo :bar]}
 
-{:destination {:namespace "{{top/ns}}.backend.endpoint.{{endpoint-name}}"
-               :anchor    'st:begin-ns-routes}
- :content     [:foo :bar]}
-
-{:destination {:namespace "{{top/ns}}.cross.endpoint-routes"
-               :anchor 'st:begin-ns-routes}
- :content     "..."}
+  {:destination {:namespace "{{top/ns}}.cross.endpoint-routes"
+                 :anchor 'st:begin-ns-routes}
+   :content     "..."})
 
 (defn ->ns
-  "Given a string or symbol, presumably representing a
-  file path, return a string that represents the
-  equivalent namespace."
+  "Given a string or symbol, presumably representing a file path, return a string
+  that represents the equivalent namespace."
   [f]
   (-> f (str) (str/replace "/" ".") (str/replace "_" "-")))
 
 (defn ->file
-  "Given a string or symbol, presumably representing a
-  namespace, return a string that represents the
-  equivalent file system path."
+  "Given a string or symbol, presumably representing a namespace, return a string
+  that represents the equivalent file system path."
   [n]
   (-> n (str) (str/replace "." "/") (str/replace "-" "_")))
 
 (defn ->subst-map
-  "Given a hash map of substitution data, return a hash map of
-  string substitutions, suitable for `tools.build.api/copy-dir`.
-  For any unqualified keys that have string or symbol values,
-  compute a `/ns` version that could be used as a namespace and
-  a `/file` version that could be used as a filename. These are
-  done fairly simply as seen above."
+  "Given a hash map of substitution data, return a hash map of string
+  substitutions, suitable for `tools.build.api/copy-dir`. For any unqualified
+  keys that have string or symbol values, compute a `/ns` version that could be
+  used as a namespace and a `/file` version that could be used as a filename.
+  These are done fairly simply as seen above."
   [data]
   (reduce-kv (fn [m k v]
                (let [n (namespace k)
@@ -168,8 +167,8 @@
              data))
 
 (defn- substitute
-  "Given a string and a substitution hash map, return the
-  string with all substitutions performed."
+  "Given a string and a substitution hash map, return the string with all
+  substitutions performed."
   [s data]
   (reduce (fn [s [from to]] (str/replace s from to)) s data))
 
