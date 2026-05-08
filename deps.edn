@@ -1,12 +1,17 @@
 {:paths ["src" "resources"]
- :deps  {org.clojure/clojure     {:mvn/version "1.11.1"}
-         rewrite-clj/rewrite-clj {:mvn/version "1.1.45"}}
+ :deps  {rewrite-clj/rewrite-clj {:mvn/version "1.2.54"}}
+
  :aliases
- {:test
+ {:dev
+  {:extra-deps {org.clojure/clojure {:mvn/version "1.12.4"}}}
+  
+  :test
   {:extra-paths ["test"]
    :extra-deps  {org.clojure/test.check {:mvn/version "1.1.1"}
                  io.github.cognitect-labs/test-runner
                  {:git/tag "v0.5.1" :git/sha "dfb30dd"}}}
-  :build {:deps       {io.github.seancorfield/build-clj
-                       {:git/tag "v0.8.2" :git/sha "0ffdb4c"}}
-          :ns-default build}}}
+
+  :build
+  {:deps       {io.github.clojure/tools.build {:mvn/version "0.9.6"}
+                slipset/deps-deploy           {:mvn/version "0.2.1"}}
+   :ns-default build}}}

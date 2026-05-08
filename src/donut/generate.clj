@@ -17,7 +17,7 @@
   (get-in point [:destination :path]))
 
 ;;---
-;; rewriting
+;; using rewrite-clj to modify existing files
 ;;---
 
 (defn find-value-parent
@@ -121,8 +121,8 @@
 ;; generators
 ;;------
 
-;; specs
-(defmulti generator-points (fn [generator-name _data] generator-name))
+;; config
+(defmulti generator-config (fn [generator-name _data] generator-name))
 
 (comment
   {:destination {:path   "{{top/file}}/backend/endpoint_routes.cljc"
@@ -207,17 +207,18 @@
   [:map
    [:destination {:optional? false}
     [:map
-     [:path string?]
+     [:path :string]
      [:namespace]
      [:extension]
-     [:dir {:optional? true} string?]]]
+     [:dir {:optional? true} :string]
+     [:data :map]]]
    [:content {:optional? false}]
-   [:data {:optional? false} map?]])
+   [:data {:optional? false} :string]])
 
 (defn generate
   [generator-name data]
   (let [{points         :points
-         generator-data :data} (generator-points generator-name data)]
+         generator-data :data} (generator-config generator-name data)]
     (doseq [point points]
       (write-point (-> point
                        (update :data merge generator-data data)
