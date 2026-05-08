@@ -169,6 +169,30 @@
              (dg/find-path ['ns :require vector?])
              (rz/sexpr)))))
 
+;;---
+;; find-value-parent
+;;---
+
+(deftest find-value-parent-test
+  (is (= '(def routes [])
+         (-> (rz/of-string "(def routes [])")
+             (dg/find-value-parent 'routes)
+             (rz/sexpr)))))
+
+
+;;---
+;; modify-node
+;;---
+
+#_
+(deftest modify-node-test
+  (testing "works with anchor"
+    (is (= '(def routes [:foo])
+           (-> (rz/of-string "(def routes [#_:routes/begin])")
+               (dg/modify-node {:content {:form :foo}
+                                :anchor  :routes/begin})
+               (rz/sexpr))))))
+
 ;;--- 
 ;; testing an actual generator
 ;;--- 
@@ -180,7 +204,7 @@
                                  endpoint-name
                                  "-endpoint"))]
     {:points
-     [;; generate the endpoint file
+     [ ;; generate the endpoint file
       {:destination {:namespace "{{endpoint-ns}}"
                      :extension "clj"
                      :dir       "test-generated-files"}
