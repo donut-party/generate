@@ -114,10 +114,12 @@ Available actions:
 | `:append-child`   | adds a child at the zipper location   |
 
 ``` clojure
-{:destination {:path "src/myapp/routes.cljc"}
- :content     {:template :foo}
- :modify      {:path ['routes vector?]
-               :actions [:append-newline :append-child]}
+(defmethod dg/generator :route [_ data]
+  {:data   data
+   :points [{:destination {:path "src/myapp/routes.cljc"}
+             :content     {:template "{{route-name}}"}
+             :modify      {:path ['routes vector?]
+                           :actions [:append-newline :append-child]}}]})
 ```
 
 Assuming routes.cljc contains this form:
@@ -127,7 +129,18 @@ Assuming routes.cljc contains this form:
   [:route-1])
 ```
 
+When you call generate, this is what happens:
 
+``` clojure
+(dg/generate :route {:route-name :boop})
+
+;; updated routes.cljc:
+(def routes
+  [:route-1
+:boop])
+```
+
+Notice that the new entry isn't indented properly. 🤷‍♂️
 
 ## Usage
 
