@@ -201,7 +201,7 @@
                (rz/sexpr))))
 
     (is (= "(def routes 
-  [:foo
+  [:foo 
 :bar])"
            (-> (rz/of-string "(def routes 
   [:foo])")
