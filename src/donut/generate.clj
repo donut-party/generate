@@ -137,6 +137,7 @@
                  :anchor 'st:begin-ns-routes}
    :content     "..."})
 
+;; substitution rendering
 (defn ->ns
   "Given a string or symbol, presumably representing a file path, return a string
   that represents the equivalent namespace."
@@ -151,14 +152,15 @@
 
 (defn ->subst-map
   "Given a hash map of substitution data, return a hash map of string
-  substitutions, suitable for `tools.build.api/copy-dir`. For any unqualified
-  keys that have string or symbol values, compute a `|ns` version that could be
-  used as a namespace and a `|file` version that could be used as a filename.
-  These are done fairly simply as seen above."
+  substitutions. For any unqualified keys that have string or symbol values,
+  compute a `|ns` version that could be used as a namespace and a `|file`
+  version that could be used as a filename. These are done fairly simply as seen
+  above."
   [substitutions]
   (reduce-kv (fn [m k v]
                (let [n (namespace k)
-                     s (str (when n (str n "/")) (name k))]
+                     s (str (some-> n (str "/"))
+                            (name k))]
                  (cond-> (assoc m (str "{{" s "}}") (str v))
                    (and (nil? n) (or (string? v) (symbol? v)))
                    (assoc (str "{{" s "|ns}}")   (->ns   v)
@@ -167,10 +169,13 @@
              substitutions))
 
 (defn- render-template
-  "Given a string and a substitution hash map, return the string with all
+  "Given a string and a subst-map hash map, return the string with all
   substitutions performed."
   [template subst-map]
-  (reduce (fn [s [from to]] (str/replace s from to)) template subst-map))
+  (reduce (fn [s [expression replacement]]
+            (str/replace s expression replacement))
+          template
+          subst-map))
 
 (defn- render-destination-namespace
   [{:keys [namespace dir extension]}]
@@ -183,7 +188,7 @@
   (str (when dir (str dir "/"))
        path))
 
-(defn- render-data-values
+(defn- render-point-strings
   "performs string substitutions on all string values in :data map"
   [{:keys [data] :as point}]
   (let [subst-map (->subst-map data)]
@@ -225,7 +230,7 @@
     (doseq [point points]
       (write-point (-> point
                        (update :data merge generator-data data)
-                       render-data-values
+                       render-point-strings
                        render-destination-values)))))
 
 (comment

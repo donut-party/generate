@@ -11,14 +11,14 @@
          (-> {:destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
                             :dir  "src"}
               :data        {:top 'my.project}}
-             (#'dg/render-data-values)
+             (#'dg/render-point-strings)
              (#'dg/render-destination-values))
 
          (-> {:destination {:namespace "{{top|ns}}.cross.endpoint-routes"
                             :extension "cljc"
                             :dir       "src"}
               :data        {:top 'my.project}}
-             (#'dg/render-data-values)
+             (#'dg/render-point-strings)
              (#'dg/render-destination-values)))))
 
 
