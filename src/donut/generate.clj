@@ -95,6 +95,29 @@
       (insert-at-path loc path actions node-to-insert))))
 
 ;;------
+;; point string rendering
+;;------
+
+(defn render-modify-point
+  [point]
+  (let [file-path (point-path point)]
+    (-> file-path
+        rz/of-file
+        (modify-node point)
+        rz/root-string)))
+
+(defn render-file-point
+  [{:keys [content] :as _point}]
+  (let [{:keys [template form]} content]
+    (if template template (str form))))
+
+(defn render-point
+  [{:keys [modify] :as point}]
+  (if modify
+    (render-modify-point point)
+    (render-file-point point)))
+
+;;------
 ;; point writers
 ;;------
 
@@ -102,18 +125,14 @@
   "handle points that specify a modification"
   [point]
   (let [file-path (point-path point)]
-    (spit file-path (-> file-path
-                        rz/of-file
-                        (modify-node point)
-                        rz/root-string))))
+    (spit file-path (render-point point))))
 
 (defn write-file-point
   "handle poitns that specify a whole file"
-  [{:keys [content] :as point}]
-  (let [file-path               (point-path point)
-        {:keys [template form]} content]
+  [point]
+  (let [file-path (point-path point)]
     (.mkdirs (java.io.File. (.getParent (java.io.File. file-path))))
-    (spit file-path (if template template (str form)))))
+    (spit file-path (render-point point))))
 
 (defn write-point
   [{:keys [modify] :as point}]
@@ -232,7 +251,7 @@
 (def ModifyPath
   [:map
    [:path [:vector :any]]
-   [:actions [:vector :keyword]]])
+   [:actions [:vector (into [:enum] (keys actions-map))]]])
 
 (def ModifyAnchor
   [:map
