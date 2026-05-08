@@ -4,12 +4,15 @@ jobs:
     environment:
       - _JAVA_OPTIONS: "-Xms512m -Xmx1024m"
     docker:
-      - image: cimg/clojure:1.11.1-openjdk-8.0-node
+      - image: circleci/clojure:openjdk-8-tools-deps-buster-node
     steps:
       - checkout
       - run:
+          name: test clj
+          command: clojure -X:test
+      - run:
           name: Build
-          command: clojure -T:build ci
+          command: clojure -T:build jar
       - save-cache:
           paths:
             - ~/bin
@@ -21,7 +24,8 @@ jobs:
             - ./
   deploy:
     docker:
-      - image: cimg/clojure:1.11.1-openjdk-8.0-node
+      # - image: cimg/clojure:1.11.1-openjdk-8.0-node # TODO
+      - image: circleci/clojure:openjdk-8-tools-deps-buster-node
     steps:
       - checkout
       - restore_cache:
