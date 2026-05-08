@@ -100,34 +100,34 @@ All string values in a point are subject to substitution. Given a `:data` map, `
 
 When a point includes a `:modify` key, `donut.generate` uses `rewrite-clj` to surgically edit an existing file rather than overwriting it. Modifications can target locations by:
 
-- **`:anchor`** a comment marker in source like `#_group:name`; the new form is inserted below it
 - **`:path` + `:actions`** navigate to a zipper location and apply actions (e.g. `:append-child`)
 
-Example with anchor:
+#### Example with `:path` + `:actions` 
 
-TODO include the anchor
+TODO explain better how `:path` works
 
-```clojure
-{:destination {:path "src/myapp/routes.cljc"}
- :content     {:template "(my-route :get \"/users\")"}
- :modify      {:anchor 'st:begin-ns-routes}}
-```
+Available actions:
 
-Anchor markers in source files look like this:
-
-```clojure
-#_st:begin-ns-routes
-```
-
-The generator will insert the new form immediately below the anchor, preserving indentation.
-
-Example with path:
+| action            | description                           |
+|-------------------|---------------------------------------|
+| `:append-newline` | adds a newline at the zipper location |
+| `:append-child`   | adds a child at the zipper location   |
 
 ``` clojure
 {:destination {:path "src/myapp/routes.cljc"}
- :content     {:template "(my-route :get \"/users\")"}
- :modify      {:anchor 'st:begin-ns-routes}}
+ :content     {:template :foo}
+ :modify      {:path ['routes vector?]
+               :actions [:append-newline :append-child]}
 ```
+
+Assuming routes.cljc contains this form:
+
+``` clojure
+(def routes
+  [:route-1])
+```
+
+
 
 ## Usage
 
@@ -177,3 +177,7 @@ Multimethod to register a generator. Return a map of `:points` and optionally `:
 ## Dependencies
 
 - [`rewrite-clj`](https://github.com/clj-commons/rewrite-clj) — for non-destructive source file modification
+
+## Next steps
+
+- try it with babashka

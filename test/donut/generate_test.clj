@@ -174,24 +174,41 @@
 ;;---
 
 (deftest find-value-parent-test
-  (is (= '(def routes [])
-         (-> (rz/of-string "(def routes [])")
-             (dg/find-value-parent 'routes)
-             (rz/sexpr)))))
+  (let [root-node (rz/of-string "(def routes #_anchor [])")]
+    (is (= '(def routes [])
+           (-> root-node
+               (dg/find-value-parent 'routes)
+               (rz/sexpr))
+           (-> root-node
+               (dg/find-value-parent 'def)
+               (rz/sexpr))))))
 
 
 ;;---
 ;; modify-node
 ;;---
 
-#_
+
 (deftest modify-node-test
-  (testing "works with anchor"
+  (testing "works with path and actions"
     (is (= '(def routes [:foo])
-           (-> (rz/of-string "(def routes [#_:routes/begin])")
+           (-> (rz/of-string "(def routes [])")
                (dg/modify-node {:content {:form :foo}
-                                :anchor  :routes/begin})
-               (rz/sexpr))))))
+                                :modify  {:path ['routes vector?]
+                                          :actions [:append-child]}})
+               (rz/root)
+               (rz/of-node)
+               (rz/sexpr))))
+
+    (is (= "(def routes 
+  [:foo
+:bar])"
+           (-> (rz/of-string "(def routes 
+  [:foo])")
+               (dg/modify-node {:content {:form :bar}
+                                :modify  {:path ['routes vector?]
+                                          :actions [:append-newline :append-child]}})
+               (rz/root-string))))))
 
 ;;--- 
 ;; testing an actual generator
@@ -204,7 +221,7 @@
                                  endpoint-name
                                  "-endpoint"))]
     {:points
-     [ ;; generate the endpoint file
+     [;; generate the endpoint file
       {:destination {:namespace "{{endpoint-ns}}"
                      :extension "clj"
                      :dir       "test-generated-files"}

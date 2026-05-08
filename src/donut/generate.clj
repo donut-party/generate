@@ -1,13 +1,11 @@
 (ns donut.generate
   "Write code generators that can be executed from the REPL"
   (:require
-   [clojure.walk :as walk]
    [clojure.string :as str]
+   [clojure.walk :as walk]
    [donut.sugar.utils :as dsu]
-   [rewrite-clj.custom-zipper.core :as rcz]
    [rewrite-clj.node.whitespace :as rnw]
-   [rewrite-clj.zip :as rz]
-   [rewrite-clj.zip.whitespace :as rzw]))
+   [rewrite-clj.zip :as rz]))
 
 ;;------
 ;; generator helpers
@@ -54,27 +52,6 @@
             loc
             path)))
 
-(defn insert-below-anchor
-  "Adds a form below an \"anchor\", where an anchor is something like
-  #_group:name"
-  [loc anchor form]
-  ;; need to use rz/up because "anchors" exist in source as forms like
-  ;; `#_pref:name`. we're finding the value `pref:name`, which exists in a
-  ;; comment node, so we need to navigate up to the comment node
-  (if-let [anchor-loc (find-value-parent loc anchor)]
-    (let [left-node  (rz/node (rcz/left anchor-loc))
-          whitespace (and (:whitespace left-node) left-node)]
-      (-> anchor-loc
-          (rcz/insert-right form)
-          (rz/right)
-          (rzw/insert-newline-left)
-          (rcz/insert-left whitespace)
-          ;; navigate back to anchor
-          (rcz/left)
-          (rcz/left)
-          (rcz/left)))
-    (throw (ex-info "Could not find anchor node" {:anchor anchor}))))
-
 (defn insert-at-path
   [loc path actions form]
   (reduce (fn [loc action]
@@ -85,14 +62,12 @@
 (defn modify-node
   "updates a node with rewrite-clj using point"
   [loc {:keys [content modify] :as _point}]
-  (let [{:keys [template form]}       content
-        {:keys [path actions anchor]} modify
-        node-to-insert                (if template
-                                        (rz/node (rz/of-string template))
-                                        form)]
-    (if anchor
-      (insert-below-anchor loc anchor node-to-insert)
-      (insert-at-path loc path actions node-to-insert))))
+  (let [{:keys [template form]} content
+        {:keys [path actions]}  modify
+        node-to-insert          (if template
+                                  (rz/node (rz/of-string template))
+                                  form)]
+    (insert-at-path loc path actions node-to-insert)))
 
 ;;------
 ;; point string rendering
