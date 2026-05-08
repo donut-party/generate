@@ -3,6 +3,7 @@
   (:require
    [clojure.walk :as walk]
    [clojure.string :as str]
+   [donut.sugar.utils :as dsu]
    [rewrite-clj.custom-zipper.core :as rcz]
    [rewrite-clj.node.whitespace :as rnw]
    [rewrite-clj.zip :as rz]
@@ -210,28 +211,53 @@
                                 path      (assoc :path (render-destination-path destination))
                                 namespace (assoc :path (render-destination-namespace destination))))))
 
+(def Content
+  [:or
+   [:map [:template :string]]
+   [:map [:form :any]]])
+
+(def PathDestination
+  [:map
+   [:path :string]
+   [:dir {:optional true} :string]
+   [:data {:optional true} :map]])
+
+(def NamespaceDestination
+  [:map
+   [:namespace :string]
+   [:extension :string]
+   [:dir {:optional true} :string]
+   [:data {:optional true} :string]])
+
+(def ModifyPath
+  [:map
+   [:path [:vector :any]]
+   [:actions [:vector :keyword]]])
+
+(def ModifyAnchor
+  [:map
+   [:anchor :keyword]])
+
 (def GeneratorPoint
   [:map
-   [:destination {:optional? false}
-    [:map
-     [:path :string]
-     [:namespace]
-     [:extension]
-     [:dir {:optional? true} :string]
-     [:data :map]]]
-   [:modify {:optional? true}
-    [:map
-     [:path :vector]
-     [:action :keyword]]]
-   [:content {:optional? false}]
-   [:data {:optional? false} :string]])
+   [:destination {:optional false} [:or PathDestination NamespaceDestination]]
+   [:modify      {:optional true}  [:or ModifyPath ModifyAnchor]]
+   [:content     Content]
+   [:data        {:optional true} [:map-of :keyword :any]]])
+
+(def Generator
+  [:map
+   [:points [:vector GeneratorPoint]]
+   [:data {:optional true} :map]])
 
 (defmulti generator (fn [generator-name _data] generator-name))
 
 (defn generate
   [generator-name data]
   (let [{points         :points
-         generator-data :data} (generator generator-name data)]
+         generator-data :data
+         :as            gen} (generator generator-name data)]
+    (dsu/validate-with-throw Generator gen)
     (doseq [point points]
       (write-point (-> point
                        (update :data merge generator-data data)

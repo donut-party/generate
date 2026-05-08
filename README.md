@@ -103,6 +103,10 @@ When a point includes a `:modify` key, `donut.generate` uses `rewrite-clj` to su
 - **`:anchor`** a comment marker in source like `#_group:name`; the new form is inserted below it
 - **`:path` + `:actions`** navigate to a zipper location and apply actions (e.g. `:append-child`)
 
+Example with anchor:
+
+TODO include the anchor
+
 ```clojure
 {:destination {:path "src/myapp/routes.cljc"}
  :content     {:template "(my-route :get \"/users\")"}
@@ -116,6 +120,14 @@ Anchor markers in source files look like this:
 ```
 
 The generator will insert the new form immediately below the anchor, preserving indentation.
+
+Example with path:
+
+``` clojure
+{:destination {:path "src/myapp/routes.cljc"}
+ :content     {:template "(my-route :get \"/users\")"}
+ :modify      {:anchor 'st:begin-ns-routes}}
+```
 
 ## Usage
 

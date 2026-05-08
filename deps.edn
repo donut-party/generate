@@ -1,5 +1,6 @@
 {:paths ["src" "resources"]
- :deps  {rewrite-clj/rewrite-clj {:mvn/version "1.2.54"}}
+ :deps  {party.donut/sugar       {:mvn/version "0.0.22"}
+         rewrite-clj/rewrite-clj {:mvn/version "1.2.54"}}
 
  :aliases
  {:dev
