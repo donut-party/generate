@@ -11,15 +11,15 @@
          (-> {:destination {:path "{{top/file}}/cross/endpoint_routes.cljc"
                             :dir  "src"}
               :data        {:top 'my.project}}
-             (#'dg/substitute-all)
-             (#'dg/parse-destination))
+             (#'dg/render-data-values)
+             (#'dg/render-destination-values))
 
          (-> {:destination {:namespace "{{top/ns}}.cross.endpoint-routes"
                             :extension "cljc"
                             :dir       "src"}
               :data        {:top 'my.project}}
-             (#'dg/substitute-all)
-             (#'dg/parse-destination)))))
+             (#'dg/render-data-values)
+             (#'dg/render-destination-values)))))
 
 
 (deftest rewrite-find-path-test

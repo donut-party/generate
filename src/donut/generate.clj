@@ -155,7 +155,7 @@
   keys that have string or symbol values, compute a `/ns` version that could be
   used as a namespace and a `/file` version that could be used as a filename.
   These are done fairly simply as seen above."
-  [data]
+  [substitutions]
   (reduce-kv (fn [m k v]
                (let [n (namespace k)
                      s (str (when n (str n "/")) (name k))]
@@ -164,42 +164,44 @@
                    (assoc (str "{{" s "/ns}}")   (->ns   v)
                           (str "{{" s "/file}}") (->file v)))))
              {}
-             data))
+             substitutions))
 
 (defn- substitute
   "Given a string and a substitution hash map, return the string with all
   substitutions performed."
-  [s data]
-  (reduce (fn [s [from to]] (str/replace s from to)) s data))
+  [s substitutions]
+  (reduce (fn [s [from to]] (str/replace s from to)) s substitutions))
 
-(defn- parse-destination-namespace
+(defn- render-destination-namespace
   [{:keys [namespace dir extension]}]
   (str (when dir (str dir "/"))
        (->file namespace)
        (when extension (str "." extension))))
 
-(defn- parse-destination-path
+(defn- render-destination-path
   [{:keys [path dir]}]
   (str (when dir (str dir "/"))
        path))
 
-(defn- substitute-all
-  [{:keys [data] :as m}]
+(defn- render-data-values
+  "performs string substitutions on all string values in :data map"
+  [{:keys [data] :as point}]
   (let [subst-map (->subst-map data)]
     (walk/postwalk #(if (string? %) (substitute % subst-map) %)
-                   m)))
+                   point)))
 
-(defn- parse-destination
-  [{:keys [destination] :as spec}]
+(defn- render-destination-values
+  "renders all values in :destination value"
+  [{:keys [destination] :as point}]
   (let [{:keys [path namespace rewrite]} destination]
     (when (and path namespace)
       (throw (ex-info "You can only specify one of :path or :namespace for a :destination"
                       {:path path, :namespace namespace})))
 
-    (assoc spec :destination (cond-> {}
-                               path      (assoc :path (parse-destination-path destination))
-                               namespace (assoc :path (parse-destination-namespace destination))
-                               rewrite   (assoc :rewrite rewrite)))))
+    (assoc point :destination (cond-> {}
+                                path      (assoc :path (render-destination-path destination))
+                                namespace (assoc :path (render-destination-namespace destination))
+                                rewrite   (assoc :rewrite rewrite)))))
 
 (def GeneratorPoint
   [:map
@@ -219,8 +221,8 @@
     (doseq [point points]
       (write-point (-> point
                        (update :data merge generator-data data)
-                       substitute-all
-                       parse-destination)))))
+                       render-data-values
+                       render-destination-values)))))
 
 (comment
   (generate :donut/endpoint {:endpoint-name 'my.endpoint}))
