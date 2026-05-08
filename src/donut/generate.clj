@@ -124,9 +124,6 @@
 ;; generators
 ;;------
 
-;; config
-(defmulti generator-config (fn [generator-name _data] generator-name))
-
 (comment
   {:destination {:path   "{{top|file}}/backend/endpoint_routes.cljc"
                  :anchor 'st:begin-ns-routes}
@@ -229,10 +226,12 @@
    [:content {:optional? false}]
    [:data {:optional? false} :string]])
 
+(defmulti generator (fn [generator-name _data] generator-name))
+
 (defn generate
   [generator-name data]
   (let [{points         :points
-         generator-data :data} (generator-config generator-name data)]
+         generator-data :data} (generator generator-name data)]
     (doseq [point points]
       (write-point (-> point
                        (update :data merge generator-data data)

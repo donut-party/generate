@@ -20,9 +20,9 @@ Example call:
 
 ## Concepts
 
-### Generator Config
+### Generator
 
-Generators are defined using the `dg/generator-config` multimethod. It receives
+Generators are defined using the `dg/generator` multimethod. It receives
 a name and user-supplied data, and returns a map with:
 
 | Key       | Description                                                     |
@@ -32,7 +32,7 @@ a name and user-supplied data, and returns a map with:
 
 
 ```clojure
-(defmethod generator-config :my/component [_ data]
+(defmethod generator :my/component [_ data]
   {:data   {:top "myapp"}
    :points [{:destination {:namespace "{{top|ns}}.components.{{component-name}}"
                            :extension "cljs"}
@@ -119,10 +119,10 @@ The generator will insert the new form immediately below the anchor, preserving 
 
 ## Usage
 
-### 1. Define a generator config
+### 1. Define a generator
 
 ```clojure
-(defmethod donut.generate/generator-config :my/endpoint [_ data]
+(defmethod donut.generate/generator :my/endpoint [_ data]
   {:data   data
    :points [{:destination {:namespace "{{top|ns}}.backend.endpoint.{{endpoint-name}}"
                            :extension "clj"
@@ -155,10 +155,10 @@ A new file is created at `src/myapp/backend/endpoint/users.clj` with content:
 ```
 Runs a named generator with the provided data map. Writes all points produced by the generator.
 
-### `generator-config`
+### `generator`
 
 ```clojure
-(defmethod generator-config :my/generator [name data] ...)
+(defmethod generator :my/generator [name data] ...)
 ```
 Multimethod to register a generator. Return a map of `:points` and optionally `:data`.
 

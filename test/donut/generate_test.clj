@@ -173,7 +173,7 @@
 ;; testing an actual generator
 ;;--- 
 
-(defmethod dg/generator-config :donut/endpoint
+(defmethod dg/generator :donut/endpoint
   [_ {:keys [top endpoint-name]}]
   (let [endpoint-ns (symbol (str (dg/->ns top)
                                  ".backend.endpoint."
