@@ -81,10 +81,11 @@
           (find-path loc path)
           actions))
 
-(defn write-node
-  [loc {:keys [content] :as point}]
+(defn modify-node
+  "updates a node with rewrite-clj using point"
+  [loc {:keys [content modify] :as _point}]
   (let [{:keys [template form]}       content
-        {:keys [path actions anchor]} (get-in point [:destination :rewrite])
+        {:keys [path actions anchor]} modify
         node-to-insert                (if template
                                         (rz/node (rz/of-string template))
                                         form)]
@@ -96,15 +97,17 @@
 ;; point writers
 ;;------
 
-(defn rewrite-point
+(defn write-modify-point
+  "handle points that specify a modification"
   [point]
   (let [file-path (point-path point)]
     (spit file-path (-> file-path
                         rz/of-file
-                        (write-node point)
+                        (modify-node point)
                         rz/root-string))))
 
 (defn write-file-point
+  "handle poitns that specify a whole file"
   [{:keys [content] :as point}]
   (let [file-path               (point-path point)
         {:keys [template form]} content]
@@ -112,9 +115,9 @@
     (spit file-path (if template template (str form)))))
 
 (defn write-point
-  [{:keys [destination] :as point}]
-  (if (:rewrite destination)
-    (rewrite-point point)
+  [{:keys [modify] :as point}]
+  (if modify
+    (write-modify-point point)
     (write-file-point point)))
 
 ;;------
@@ -201,15 +204,14 @@
 (defn- render-destination-values
   "renders all values in :destination value"
   [{:keys [destination] :as point}]
-  (let [{:keys [path namespace rewrite]} destination]
+  (let [{:keys [path namespace]} destination]
     (when (and path namespace)
       (throw (ex-info "You can only specify one of :path or :namespace for a :destination"
                       {:path path, :namespace namespace})))
 
     (assoc point :destination (cond-> {}
                                 path      (assoc :path (render-destination-path destination))
-                                namespace (assoc :path (render-destination-namespace destination))
-                                rewrite   (assoc :rewrite rewrite)))))
+                                namespace (assoc :path (render-destination-namespace destination))))))
 
 (def GeneratorPoint
   [:map
@@ -220,6 +222,10 @@
      [:extension]
      [:dir {:optional? true} :string]
      [:data :map]]]
+   [:modify {:optional? true}
+    [:map
+     [:path :vector]
+     [:action :keyword]]]
    [:content {:optional? false}]
    [:data {:optional? false} :string]])
 

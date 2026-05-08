@@ -51,17 +51,17 @@
        }
 
       ;; update the routes namespaces
-      {:destination {:path    "{{top|file}}/cross/endpoint_routes.cljc"
-                     :dir     "test-generated-files"
-                     :rewrite {:path    ['ns :require]
-                               :actions [:append-child]}}
+      {:destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
+                     :dir  "test-generated-files"}
+       :modify      {:path    ['ns :require]
+                     :actions [:append-child]}
        :content     {:form [endpoint-ns :as endpoint-name]}}
 
       ;; update the routes
-      {:destination {:path    "{{top|file}}/cross/endpoint_routes.cljc"
-                     :dir     "test-generated-files"
-                     :rewrite {:path    ['routes vector?]
-                               :actions [:append-child]}}
+      {:destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
+                     :dir  "test-generated-files"}
+       :modify      {:path    ['routes vector?]
+                     :actions [:append-child]}
        :content     {:template "[\"{{route-prefix}}/{{endpoint-name}}\"
    {:name     {{endpoint-name-kw}}
     :ent-type {{endpoint-name-kw}}
