@@ -147,12 +147,13 @@ Notice that the new entry isn't indented properly. 🤷‍♂️
 ### 1. Define a generator
 
 ```clojure
+;; this generator will create a new file and write its `ns` form
 (defmethod donut.generate/generator :my/endpoint [_ data]
   {:data   data
    :points [{:destination {:namespace "{{top|ns}}.backend.endpoint.{{endpoint-name}}"
                            :extension "clj"
                            :dir       "src"}
-             :data        {}
+             :data        {} ;; optional point-specific data
              :content     {:template "(ns {{top|ns}}.backend.endpoint.{{endpoint-name}})"}}]})
 ```
 
