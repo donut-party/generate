@@ -42,12 +42,20 @@
   [loc _]
   (rz/append-child loc (rnw/newlines 1)))
 
+(defn pred
+  "Navigate tree by pred"
+  [p]
+  (fn find-path-pred [loc]
+    (rz/find loc
+             rz/next
+             (get nav-substitutions p p))))
+
 (defn find-path
   [loc path]
   (let [path (map (fn [x] (get nav-substitutions x x)) path)]
     (reduce (fn [loc nav-item]
               (if (fn? nav-item)
-                (rz/find loc rz/next nav-item)
+                (nav-item loc)
                 (find-value-parent loc nav-item)))
             loc
             path)))

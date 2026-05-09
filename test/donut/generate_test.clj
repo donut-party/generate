@@ -166,7 +166,7 @@
 
   (is (= []
          (-> (rz/of-string "(ns foo (:require []))")
-             (dg/find-path ['ns :require vector?])
+             (dg/find-path ['ns :require (dg/pred vector?)])
              (rz/sexpr)))))
 
 ;;---
@@ -188,13 +188,12 @@
 ;; modify-node
 ;;---
 
-
 (deftest modify-node-test
   (testing "works with path and edits"
     (is (= '(def routes [:foo])
            (-> (rz/of-string "(def routes [])")
                (dg/modify-node {:content {:form :foo}
-                                :modify  {:path  ['routes vector?]
+                                :modify  {:path  ['routes (dg/pred vector?)]
                                           :edits [rz/append-child]}})
                (rz/root)
                (rz/of-node)
@@ -206,7 +205,7 @@
            (-> (rz/of-string "(def routes 
   [:foo])")
                (dg/modify-node {:content {:form :bar}
-                                :modify  {:path  ['routes vector?]
+                                :modify  {:path  ['routes (dg/pred vector?)]
                                           :edits [dg/append-child-newline rz/append-child]}})
                (rz/root-string))))))
 
@@ -239,7 +238,7 @@
       ;; update the routes
       {:destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
                      :dir  "test-generated-files"}
-       :modify      {:path  ['routes vector?]
+       :modify      {:path  ['routes (dg/pred vector?)]
                      :edits [rz/append-child]}
        :content     {:template "[\"{{route-prefix}}/{{endpoint-name}}\"
    {:name     {{endpoint-name-kw}}
