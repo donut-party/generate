@@ -53,20 +53,20 @@
             path)))
 
 (defn insert-at-path
-  [loc path actions form]
+  [loc path edits form]
   (reduce (fn [loc action] (action loc form))
           (find-path loc path)
-          actions))
+          edits))
 
 (defn modify-node
   "updates a node with rewrite-clj using point"
   [loc {:keys [content modify] :as _point}]
   (let [{:keys [template form]} content
-        {:keys [path actions]}  modify
+        {:keys [path edits]}  modify
         node-to-insert          (if template
                                   (rz/node (rz/of-string template))
                                   form)]
-    (insert-at-path loc path actions node-to-insert)))
+    (insert-at-path loc path edits node-to-insert)))
 
 ;;------
 ;; point string rendering
@@ -225,7 +225,7 @@
 (def ModifyPath
   [:map
    [:path [:vector :any]]
-   [:actions [:vector fn?]]])
+   [:edits [:vector fn?]]])
 
 (def ModifyAnchor
   [:map
