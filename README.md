@@ -4,7 +4,7 @@
 
 A code generation library for Clojure projects. Write generators that create or
 modify source files using template substitution and structural code editing via
-`rewrite-clj`.
+`rewrite-clj`. Intended to serve the same purpose as Ruby on Rails generators.
 
 Status: alpha.
 
