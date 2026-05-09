@@ -23,6 +23,8 @@ Which then:
 This library does not include any Donut-specific generators; other you can use
 it in your own project to define your own generators that consumers can then use.
 
+Status: alpha
+
 ## Example
 
 From [dev/donut/generate/examples.clj](dev/donut/generate/examples.clj):
