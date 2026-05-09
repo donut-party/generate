@@ -3,6 +3,15 @@
    [clojure.java.shell :as sh]
    [donut.generate :as dg]))
 
+(defmethod dg/generator ::endpoint-file
+  [_ {:keys [top endpoint-name] :as data}]
+  (let [ns-name (str top ".backend.endpoint." endpoint-name "-endpoint")]
+    {:points [{:destination {:namespace ns-name
+                             :extension "clj"
+                             :dir       "test-generated-files"}
+               :content     {:template "(ns {{ns-name}})"}}]
+     :data   (assoc data :ns-name ns-name)}))
+
 (defmethod dg/generator ::add-endpoint
   [_ {:keys [top endpoint-name]}]
   (let [endpoint-ns (symbol (str (dg/->ns top)
@@ -61,11 +70,19 @@
     (sh/sh "rm" "-rf" output-directory)
     (sh/sh "cp" "-r" source-directory output-directory)))
 
-(defn try-generate
+(defn try-generate-endpoint
   "After running check these files:
   - test-generated-files/generate_test/cross/endpoint_routes.cljc
-  - test-generated-files/generate_test/backend/user_endpoints.clj"
+  - test-generated-files/generate_test/backend/endpoints/users_endpoint.clj"
   []
   (setup-example-space)
   (dg/generate ::add-endpoint {:endpoint-name 'users
                                :top           "generate-test"}))
+
+(defn try-generate-endpoint-file
+  "After running check the file
+  test-generated-files/generate_test/backend/endpoints/lists_endpoint.clj"
+  []
+  (setup-example-space)
+  (dg/generate ::endpoint-file {:endpoint-name 'lists
+                                :top           'generate-test}))
