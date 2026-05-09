@@ -38,9 +38,9 @@
    set?        rz/set?
    vector?     rz/vector?})
 
-(def actions-map
-  {:append-child   rz/append-child
-   :append-newline (fn [loc _] (rz/append-child loc (rnw/newlines 1)))})
+(defn append-child-newline
+  [loc _]
+  (rz/append-child loc (rnw/newlines 1)))
 
 (defn find-path
   [loc path]
@@ -54,8 +54,7 @@
 
 (defn insert-at-path
   [loc path actions form]
-  (reduce (fn [loc action]
-            ((action actions-map) loc form))
+  (reduce (fn [loc action] (action loc form))
           (find-path loc path)
           actions))
 
@@ -226,7 +225,7 @@
 (def ModifyPath
   [:map
    [:path [:vector :any]]
-   [:actions [:vector (into [:enum] (keys actions-map))]]])
+   [:actions [:vector fn?]]])
 
 (def ModifyAnchor
   [:map

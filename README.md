@@ -1,8 +1,12 @@
 # donut.generate
 
+[![Clojars Project](https://img.shields.io/clojars/v/party.donut/generate.svg)](https://clojars.org/party.donut/generate)
+
 A code generation library for Clojure projects. Write generators that create or
 modify source files using template substitution and structural code editing via
 `rewrite-clj`.
+
+Status: alpha.
 
 ## Overview
 
@@ -229,3 +233,5 @@ Multimethod to register a generator. Return a map of `:points` and optionally `:
 
 - try it with babashka
 - log results of running generator
+- testing helpers
+- use `:data-schema` for validation when calling `generate`

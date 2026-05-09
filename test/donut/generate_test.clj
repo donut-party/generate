@@ -194,8 +194,8 @@
     (is (= '(def routes [:foo])
            (-> (rz/of-string "(def routes [])")
                (dg/modify-node {:content {:form :foo}
-                                :modify  {:path ['routes vector?]
-                                          :actions [:append-child]}})
+                                :modify  {:path    ['routes vector?]
+                                          :actions [rz/append-child]}})
                (rz/root)
                (rz/of-node)
                (rz/sexpr))))
@@ -206,8 +206,8 @@
            (-> (rz/of-string "(def routes 
   [:foo])")
                (dg/modify-node {:content {:form :bar}
-                                :modify  {:path ['routes vector?]
-                                          :actions [:append-newline :append-child]}})
+                                :modify  {:path    ['routes vector?]
+                                          :actions [dg/append-child-newline rz/append-child]}})
                (rz/root-string))))))
 
 ;;--- 
@@ -233,14 +233,14 @@
       {:destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
                      :dir  "test-generated-files"}
        :modify      {:path    ['ns :require]
-                     :actions [:append-child]}
+                     :actions [rz/append-child]}
        :content     {:form [endpoint-ns :as endpoint-name]}}
 
       ;; update the routes
       {:destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
                      :dir  "test-generated-files"}
        :modify      {:path    ['routes vector?]
-                     :actions [:append-child]}
+                     :actions [rz/append-child]}
        :content     {:template "[\"{{route-prefix}}/{{endpoint-name}}\"
    {:name     {{endpoint-name-kw}}
     :ent-type {{endpoint-name-kw}}
