@@ -255,7 +255,7 @@
 (deftest generator-test
   (let [current-directory (System/getProperty "user.dir")
         output-directory  (str current-directory "/test-generated-files")
-        source-directory  (str current-directory "/resources/test-generated-files")]
+        source-directory  (str current-directory "/dev-resources/test-generated-files")]
     (sh/sh "rm" "-rf" output-directory)
     (sh/sh "cp" "-r" source-directory output-directory)
     (dg/generate :donut/endpoint {:endpoint-name 'users
