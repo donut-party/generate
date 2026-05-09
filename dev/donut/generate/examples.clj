@@ -10,7 +10,7 @@
                                  endpoint-name
                                  "-endpoint"))]
     {:points
-     [;; generate the endpoint file
+     [ ;; creates a new file for the endpoint
       {:destination {:namespace "{{endpoint-ns}}"
                      :extension "clj"
                      :dir       "test-generated-files"}
@@ -18,7 +18,7 @@
 ;; content goes here"}
        }
 
-      ;; add a namespace require
+      ;; updates an existing file, add a namespace require
       ;; shows using a content form
       {:destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
                      :dir  "test-generated-files"}
@@ -26,7 +26,7 @@
                      :actions [:append-child]}
        :content     {:form [endpoint-ns :as endpoint-name]}}
 
-      ;; add a route entry
+      ;; updates an existing file, adding a route entry
       {:destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
                      :dir  "test-generated-files"}
        :modify      {:path    ['routes vector?]
@@ -43,10 +43,15 @@
                    :endpoint-ns      endpoint-ns
                    :endpoint-name-kw (keyword endpoint-name)}}))
 
-(defn try-generate
-  "When you run this it generates these files:
-  - test-generated-files/generate_test/cross/endpoint_routes.cljc
-  - test-generated-files/generate_test/backend/user_endpoints.clj"
+(defn setup-example-space
+  "Generators can create files or modify existing files. The ::add-endpoint
+  generator works on files in the test-generated-files directory, creating one
+  file (user_endpoint.clj) and updating another (endpoint_routes.cljc).
+
+  We set up the test-generated-files directory before running an example,
+  deleting the existing directory to remove any previous outputs and copying
+  files from dev-resources/test-generated files. Copying those files lets us try
+  out modifying existing files."
   []
   (let [current-directory (System/getProperty "user.dir")
         output-directory  (str current-directory "/test-generated-files")
@@ -54,6 +59,13 @@
     ;; sets up directories for example purposes; you generally won't have to do
     ;; this in real usage
     (sh/sh "rm" "-rf" output-directory)
-    (sh/sh "cp" "-r" source-directory output-directory)
-    (dg/generate ::add-endpoint {:endpoint-name 'users
-                                 :top           "generate-test"})))
+    (sh/sh "cp" "-r" source-directory output-directory)))
+
+(defn try-generate
+  "After running check these files:
+  - test-generated-files/generate_test/cross/endpoint_routes.cljc
+  - test-generated-files/generate_test/backend/user_endpoints.clj"
+  []
+  (setup-example-space)
+  (dg/generate ::add-endpoint {:endpoint-name 'users
+                               :top           "generate-test"}))
