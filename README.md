@@ -4,7 +4,8 @@
 
 A code generation library for Clojure projects. Write generators that create or
 modify source files using template substitution and structural code editing via
-`rewrite-clj`. Intended to serve the same purpose as Ruby on Rails generators.
+[rewrite-clj](https://github.com/clj-commons/rewrite-clj). Serves the same
+purpose as Ruby on Rails generators.
 
 It's used by the Donut single-page app framework to allow users to call
 something like this:
