@@ -135,28 +135,29 @@ All string values in a point are subject to substitution. Given a `:data` map, `
 
 ### File Modification
 
-When a point includes a `:modify` key, `donut.generate` uses `rewrite-clj` to surgically edit an existing file rather than overwriting it. Modifications can target locations by:
+When a point includes a `:modify` key, `donut.generate` uses
+[rewrite-clj](https://github.com/clj-commons/rewrite-clj/blob/main/doc/01-user-guide.adoc)
+to surgically edit an existing file rather than overwriting it.
 
-- **`:path` + `:actions`** navigate to a zipper location and apply actions (e.g. `:append-child`)
+The `:modify` map has two keys:
 
-#### Example with `:path` + `:actions` 
+| key      | description                         |
+|----------|-------------------------------------|
+| `:path`  | navigates to data structure to edit |
+| `:edits` | rewrite-clj edit functions to apply |
 
-TODO explain better how `:path` works
 
-Available actions:
+`:path` is a vector of values and predicate functions for navigating to the data
+structure you want to edit.
 
-| action            | description                           |
-|-------------------|---------------------------------------|
-| `:append-newline` | adds a newline at the zipper location |
-| `:append-child`   | adds a child at the zipper location   |
 
 ``` clojure
 (defmethod dg/generator :route [_ data]
   {:data   data
    :points [{:destination {:path "src/myapp/routes.cljc"}
              :content     {:template "{{route-name}}"}
-             :modify      {:path ['routes vector?]
-                           :actions [:append-newline :append-child]}}]})
+             :modify      {:path  ['routes vector?]
+                           :edits [dg/append-newline-child rz/append-child]}}]})
 ```
 
 Assuming routes.cljc contains this form:
