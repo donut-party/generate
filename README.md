@@ -147,16 +147,27 @@ The `:modify` map has two keys:
 | `:edits` | rewrite-clj edit functions to apply |
 
 
-`:path` is a vector of values and predicate functions for navigating to the data
-structure you want to edit.
+`:path` is a vector of rewrite-clj navigators for navigating to the data
+structure you want to edit. The `:path` vector also allows these kinds of values
+for convenience:
 
+* **clojure value**
+  * example: `'routes'`
+  * behavior: navigates to parent of that value
+* **`donut.generate/pred` navigator**
+  * example: `(donut.generate/pred vector?)`
+  * behavior: navigates to value where pred? returns true. Note that `pred?`
+    should be a rewrite-clj predicate. The Clojure predicates `map?`, `list?`,
+    `seq?`, `set?`, and `vector?` are mapped to their rewrite-clj equivalent
+
+Example:
 
 ``` clojure
 (defmethod dg/generator :route [_ data]
   {:data   data
    :points [{:destination {:path "src/myapp/routes.cljc"}
              :content     {:template "{{route-name}}"}
-             :modify      {:path  ['routes vector?]
+             :modify      {:path  ['routes (dg/pred vector?)]
                            :edits [dg/append-newline-child rz/append-child]}}]})
 ```
 
