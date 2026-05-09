@@ -6,26 +6,22 @@ A code generation library for Clojure projects. Write generators that create or
 modify source files using template substitution and structural code editing via
 `rewrite-clj`. Intended to serve the same purpose as Ruby on Rails generators.
 
-Status: alpha.
+It's used by the Donut single-page app framework to allow users to call
+something like this:
 
-## Overview
-
-`donut.generate` lets you define and execute generators that create new files or
-modify existing ones.
-
-You define generators using the `donut.generate/generator` multimethod. Methods
-define the file system path patterns for what files get create or modified, how
-to navigate to the form to modify, and content templates for modification.
-
-You execute a generator with `(donut.generate/generate :generator-name data)`.
-You can use `data` to pass in values that further specify what file 
-
-Example call:
-
-```clojure
-(require '[donut.generate :as dg])
-(dg/generate :donut/endpoint {:endpoint-name 'my.endpoint})
+``` clojure
+(dg/generate :donut/endpoint {:endpoint-name 'lists
+                              :top 'my-app})
 ```
+
+Which then:
+
+1. Creates the file `src/my_app/backend/endpoints/lists_endpoint.clj`
+2. Modifies the file `src/my_app/backend/routes.clj`, updating the list of
+   routes to include the routes from the new endpoint
+
+This library does not include any Donut-specific generators; other you can use
+it in your own project to define your own generators that consumers can then use.
 
 ## Example
 
