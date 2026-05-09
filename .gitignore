@@ -1,6 +1,7 @@
 .calva/output-window/
 .classpath
 .clj-kondo/.cache
+.clj-kondo/metosin
 .clj-kondo/rewrite-clj
 .cpcache
 .eastwood
