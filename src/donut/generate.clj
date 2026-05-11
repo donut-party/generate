@@ -182,7 +182,7 @@
 (defn- render-destination-namespace
   [{:keys [namespace dir extension]}]
   (str (when dir (str dir "/"))
-       (->file namespace)
+       (->file (name namespace))
        (when extension (str "." extension))))
 
 (defn- render-destination-path
@@ -225,7 +225,7 @@
 
 (def NamespaceDestination
   [:map
-   [:namespace :string]
+   [:namespace [:or :symbol :string :keyword]]
    [:extension :string]
    [:dir {:optional true} :string]
    [:data {:optional true} :string]])
@@ -235,14 +235,10 @@
    [:path [:vector :any]]
    [:edits [:vector fn?]]])
 
-(def ModifyAnchor
-  [:map
-   [:anchor :keyword]])
-
 (def GeneratorPoint
   [:map
    [:destination {:optional false} [:or PathDestination NamespaceDestination]]
-   [:modify      {:optional true}  [:or ModifyPath ModifyAnchor]]
+   [:modify      {:optional true}  ModifyPath]
    [:content     Content]
    [:data        {:optional true} [:map-of :keyword :any]]])
 
