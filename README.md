@@ -246,3 +246,4 @@ Multimethod to register a generator. Return a map of `:points` and optionally `:
 - log results of running generator
 - testing helpers
 - use `:data-schema` for validation when calling `generate`
+- handle exceptions by logging
