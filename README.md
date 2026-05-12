@@ -21,8 +21,8 @@ Which then:
 2. Modifies the file `src/my_app/backend/routes.clj`, updating the list of
    routes to include the routes from the new endpoint
 
-This library does not include any Donut-specific generators; other you can use
-it in your own project to define your own generators that consumers can then use.
+This library does not include any Donut-specific generators; you can use it in
+your own project to define your own generators that consumers can then use.
 
 Status: alpha
 
