@@ -80,7 +80,7 @@ a name and user-supplied data, and returns a map with:
 
 ### Point
 
-A point is a map describing a single file operation:
+A point is a map describing what to generate and where.
 
 | Key            | Description                                                                           |
 |----------------|---------------------------------------------------------------------------------------|
@@ -91,7 +91,8 @@ A point is a map describing a single file operation:
 
 ### Destinations
 
-A `:destination` map supports two modes; you must use exactly one:
+`:destination` describes what file to update. You can describe either a file
+system path or a namespace.
 
 **`:path`** a literal (or templated) file path:
 ```clojure
@@ -132,11 +133,13 @@ All string values in a point are subject to substitution. Given a `:data` map, `
 "{{top|file}}"  => "my_app/core"
 ```
 
+Note that substitution is whitespace-sensitive; `{{top}}` works but `{{ top }}` doesn't.
+
 ### File Modification
 
 When a point includes a `:modify` key, `donut.generate` uses
 [rewrite-clj](https://github.com/clj-commons/rewrite-clj/blob/main/doc/01-user-guide.adoc)
-to surgically edit an existing file rather than overwriting it.
+to edit an existing file rather than overwriting it.
 
 The `:modify` map has two keys:
 
