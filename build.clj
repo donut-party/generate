@@ -19,7 +19,7 @@
 
 (defn- pom-template [version]
   [[:description "generators for clojure"]
-   [:url "https://github.com/donut-power/generate"]
+   [:url "https://github.com/donut-party/generate"]
    [:licenses
     [:license
      [:name "MIT"]
@@ -28,9 +28,9 @@
     [:developer
      [:name "Daniel Higginbotham"]]]
    [:scm
-    [:url "https://github.com/donut-power/generate"]
-    [:connection "scm:git:https://github.com/donut-power/generate.git"]
-    [:developerConnection "scm:git:ssh:git@github.com:donut-power/generate.git"]
+    [:url "https://github.com/donut-party/generate"]
+    [:connection "scm:git:https://github.com/donut-party/generate.git"]
+    [:developerConnection "scm:git:ssh:git@github.com:donut-party/generate.git"]
     [:tag (str "v" version)]]])
 
 (defn- jar-opts [opts]
