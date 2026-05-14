@@ -62,7 +62,7 @@
 
 (defn insert-at-path
   [loc path edits form]
-  (reduce (fn [loc action] (action loc form))
+  (reduce (fn [loc edit] (edit loc form))
           (find-path loc path)
           edits))
 
