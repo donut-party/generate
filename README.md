@@ -70,7 +70,9 @@ a name and user-supplied data, and returns a map with:
 ```clojure
 (defmethod generator :my/component [_ data]
   {:data   {:top "myapp"}
-   :points [{:destination {:namespace "{{top|ns}}.components.{{component-name}}"
+   :points [{:id :name-of-point-for-logging-debugging
+             :description "describe what the point does, helps with logging"
+             :destination {:namespace "{{top|ns}}.components.{{component-name}}"
                            :extension "cljs"}
              :data        {}
              :content     {:template "(ns {{top|ns}}.components.{{component-name}})"}}]})
@@ -84,6 +86,8 @@ A point is a map describing what to generate and where.
 
 | Key            | Description                                                                           |
 |----------------|---------------------------------------------------------------------------------------|
+| `:id`          | Keyword, used for logging and exception handling                                      |
+| `:description` | String, used for logging                                                              |
 | `:destination` | Where to write via `:path` or `:namespace` (see below)                                |
 | `:content`     | What to write a `:template` string or a `:form` (quoted Clojure form)                 |
 | `:data`        | Local substitution data, merged with generator-level data                             |

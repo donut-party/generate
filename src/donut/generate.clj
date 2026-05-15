@@ -2,10 +2,14 @@
   "Write code generators that can be executed from the REPL"
   (:require
    [clojure.string :as str]
+   [clojure.tools.logging :as log]
    [clojure.walk :as walk]
    [donut.sugar.utils :as dsu]
    [rewrite-clj.node.whitespace :as rnw]
    [rewrite-clj.zip :as rz]))
+
+(def ^:dynamic *error-handler* nil)
+(def ^:dynamic *info-handler* nil)
 
 ;;------
 ;; generator helpers
@@ -110,7 +114,7 @@
     (spit file-path (render-point point))))
 
 (defn write-file-point
-  "handle poitns that specify a whole file"
+  "handle points that specify a whole file"
   [point]
   (let [file-path (point-path point)]
     (.mkdirs (java.io.File. (.getParent (java.io.File. file-path))))
@@ -118,9 +122,13 @@
 
 (defn write-point
   [{:keys [modify] :as point}]
-  (if modify
-    (write-modify-point point)
-    (write-file-point point)))
+  (try
+    (*info-handler* point)
+    (if modify
+      (write-modify-point point)
+      (write-file-point point))
+    (catch Exception e
+      (*error-handler* point e))))
 
 ;;------
 ;; generators
@@ -230,36 +238,63 @@
    [:dir {:optional true} :string]
    [:data {:optional true} :string]])
 
-(def ModifyPath
+(def Modify
   [:map
    [:path [:vector :any]]
    [:edits [:vector fn?]]])
 
 (def GeneratorPoint
   [:map
+   [:id          {:optional false} :any]
+   [:description {:optional false} :string]
    [:destination {:optional false} [:or PathDestination NamespaceDestination]]
-   [:modify      {:optional true}  ModifyPath]
+   [:modify      {:optional true}  Modify]
    [:content     Content]
    [:data        {:optional true} [:map-of :keyword :any]]])
 
 (def Generator
   [:map
    [:points [:vector GeneratorPoint]]
+   [:data-schema {:optional true} :any]
    [:data {:optional true} :map]])
 
 (defmulti generator (fn [generator-name _data] generator-name))
+
+(defn info-logger
+  [point]
+  (log/info (select-keys point [:id :description :destination])))
+
+(defn error-logger
+  [point error]
+  (log/error error (select-keys point [::generator-name :destination :id])))
+
+(defn mk-event-handlers
+  [{:keys [::opts]}]
+  (let [event-handlers (:event-handlers opts)]
+    (cond
+      (= event-handlers :clojure.tools.logging) {:info  info-logger
+                                                 :error error-logger}
+      (nil? event-handlers)                     {:info  (constantly nil)
+                                                 :error (constantly nil)}
+      (and (fn? (:info event-handlers))
+           (fn? (:error event-handlers)))       event-handlers
+      :else                                     (throw (ex-info "invalid event handlers" event-handlers)))))
 
 (defn generate
   [generator-name data]
   (let [{points         :points
          generator-data :data
-         :as            gen} (generator generator-name data)]
+         :as            gen} (generator generator-name data)
+        {:keys [info error]} (mk-event-handlers data)]
     (dsu/validate-with-throw Generator gen)
-    (doseq [point points]
-      (write-point (-> point
-                       (update :data merge generator-data data)
-                       render-point-strings
-                       render-destination-values)))))
+    (binding [*info-handler*  info
+              *error-handler* error]
+      (doseq [point points]
+        (write-point (-> point
+                         (assoc ::generator-name generator-name)
+                         (update :data merge generator-data data)
+                         render-point-strings
+                         render-destination-values))))))
 
 (comment
   (generate :donut/endpoint {:endpoint-name 'my.endpoint}))
