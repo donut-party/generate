@@ -221,7 +221,9 @@
                                  "-endpoint"))]
     {:points
      [;; generate the endpoint file
-      {:destination {:namespace "{{endpoint-ns}}"
+      {:id          ::endpoint-file
+       :description "writes endpoint file"
+       :destination {:namespace "{{endpoint-ns}}"
                      :extension "clj"
                      :dir       "test-generated-files"}
        :content     {:template "(ns {{endpoint-ns}})
@@ -229,14 +231,18 @@
        }
 
       ;; update the routes namespaces
-      {:destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
+      {:id          ::add-route-ns-require
+       :description "adds a ns alias to :require"
+       :destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
                      :dir  "test-generated-files"}
        :modify      {:path  ['ns :require]
                      :edits [rz/append-child]}
        :content     {:form [endpoint-ns :as endpoint-name]}}
 
       ;; update the routes
-      {:destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
+      {:id          ::add-route
+       :description "adds route definition to routes"
+       :destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
                      :dir  "test-generated-files"}
        :modify      {:path  ['routes (dg/pred vector?)]
                      :edits [rz/append-child]}
