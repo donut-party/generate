@@ -191,10 +191,10 @@
 (deftest modify-node-test
   (testing "works with path and edits"
     (is (= '(def routes [:foo])
-           (-> (rz/of-string "(def routes [])")
-               (dg/modify-node {:content {:form :foo}
+           (-> (dg/modify-node {:content {:form :foo}
                                 :modify  {:path  ['routes (dg/pred vector?)]
-                                          :edits [rz/append-child]}})
+                                          :edits [rz/append-child]
+                                          :loc   (rz/of-string "(def routes [])")}})
                (rz/root)
                (rz/of-node)
                (rz/sexpr))))
@@ -202,11 +202,11 @@
     (is (= "(def routes 
   [:foo 
 :bar])"
-           (-> (rz/of-string "(def routes 
-  [:foo])")
-               (dg/modify-node {:content {:form :bar}
+           (-> (dg/modify-node {:content {:form :bar}
                                 :modify  {:path  ['routes (dg/pred vector?)]
-                                          :edits [dg/append-child-newline rz/append-child]}})
+                                          :edits [dg/append-child-newline rz/append-child]
+                                          :loc   (rz/of-string "(def routes 
+  [:foo])")}})
                (rz/root-string))))))
 
 ;;--- 

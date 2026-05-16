@@ -54,37 +54,53 @@
              rz/next
              (get nav-substitutions p p))))
 
+(defn find-path-nav-item
+  "navigate location using a nav item"
+  [])
+
 (defn find-path
   "navigates to a location using the values in a vector"
   [loc path]
   (let [path (map (fn [x] (get nav-substitutions x x)) path)]
     (reduce (fn [loc nav-item]
-              (if (fn? nav-item)
-                ;; functions are rewrite-clj navigates
-                (nav-item loc)
-                ;; non-function values are used to navigate to that value's
-                ;; parent. we use the value's parent because most edits are
-                ;; meant to append to a list, vector, or map, and the value is
-                ;; typically a symbol that's used as a kind of anchor
-                (find-value-parent loc nav-item)))
+              (let [new-loc (if (fn? nav-item)
+                              ;; functions are rewrite-clj navigates
+                              (nav-item loc)
+                              ;; non-function values are used to navigate to that value's
+                              ;; parent. we use the value's parent because most edits are
+                              ;; meant to append to a list, vector, or map, and the value is
+                              ;; typically a symbol that's used as a kind of anchor
+                              (find-value-parent loc nav-item))]
+                (if (nil? new-loc)
+                  (reduced {::error nav-item})
+                  new-loc)))
             loc
             path)))
 
 (defn edit-at-path
-  [loc path edits form]
-  (reduce (fn [loc edit] (edit loc form))
-          (find-path loc path)
-          edits))
+  [{:keys [modify] :as point}]
+  (let [{:keys [path edits loc node-to-insert]} modify
+        modify-loc (find-path loc path)]
+    (if-let [error-nav-item (::error modify-loc)]
+      (*error-handler* point (ex-info "could not navigate to loc to modify" {:nav-item error-nav-item}))
+      (reduce (fn [loc edit] (edit loc node-to-insert))
+              modify-loc
+              edits))))
 
-(defn modify-node
-  "updates a node with rewrite-clj using point"
-  [loc {:keys [content modify] :as _point}]
+(defn assoc-modify-node-to-insert
+  [{:keys [content] :as point}]
   (let [{:keys [template form]} content
-        {:keys [path edits]}  modify
         node-to-insert          (if template
                                   (rz/node (rz/of-string template))
                                   form)]
-    (edit-at-path loc path edits node-to-insert)))
+    (assoc-in point [:modify :node-to-insert] node-to-insert)))
+
+(defn modify-node
+  "updates a node with rewrite-clj using point"
+  [point]
+  (-> point
+      assoc-modify-node-to-insert
+      edit-at-path))
 
 ;;------
 ;; point string rendering
@@ -92,8 +108,9 @@
 
 (defn render-modify-point
   [{:keys [::read] :as point}]
-  (-> (read point)
-      (modify-node point)
+  (-> point
+      (assoc-in [:modify :loc] (read point))
+      modify-node
       rz/root-string))
 
 (defn render-file-point
@@ -293,19 +310,26 @@
               {::read  (comp rz/of-file point-path)
                ::write write-point-to-file}))
 
+(defn test-read-fn
+  [point-source-map]
+  (fn [{:keys [id]}]
+    (let [source (get point-source-map id)]
+      (if (string? source)
+        (rz/of-string source)
+        (-> ""
+            (rz/of-string)
+            (rz/append-child source))))))
+
+(defn test-write
+  [{:keys [contents] :as point}]
+  {:file-path (point-path point)
+   :contents  contents})
+
 (defn test-read-write
   "creates a reader and writer for tests"
   [point-source-map]
-  {::read  (fn [{:keys [id]}]
-             (let [source (get point-source-map id)]
-               (if (string? source)
-                 (rz/of-string source)
-                 (-> ""
-                     (rz/of-string)
-                     (rz/append-child source)))))
-   ::write (fn [{:keys [contents] :as point}]
-             {:file-path (point-path point)
-              :contents  contents})})
+  {::read  (test-read-fn point-source-map)
+   ::write test-write})
 
 (defn generate
   [generator-name data]
