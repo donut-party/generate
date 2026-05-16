@@ -20,7 +20,7 @@
   (get-in point [:destination :path]))
 
 ;;---
-;; using rewrite-clj to modify existing files
+;; using rewrite-clj to modify source
 ;;---
 
 (defn find-value-parent
@@ -55,16 +55,22 @@
              (get nav-substitutions p p))))
 
 (defn find-path
+  "navigates to a location using the values in a vector"
   [loc path]
   (let [path (map (fn [x] (get nav-substitutions x x)) path)]
     (reduce (fn [loc nav-item]
               (if (fn? nav-item)
+                ;; functions are rewrite-clj navigates
                 (nav-item loc)
+                ;; non-function values are used to navigate to that value's
+                ;; parent. we use the value's parent because most edits are
+                ;; meant to append to a list, vector, or map, and the value is
+                ;; typically a symbol that's used as a kind of anchor
                 (find-value-parent loc nav-item)))
             loc
             path)))
 
-(defn insert-at-path
+(defn edit-at-path
   [loc path edits form]
   (reduce (fn [loc edit] (edit loc form))
           (find-path loc path)
@@ -78,19 +84,17 @@
         node-to-insert          (if template
                                   (rz/node (rz/of-string template))
                                   form)]
-    (insert-at-path loc path edits node-to-insert)))
+    (edit-at-path loc path edits node-to-insert)))
 
 ;;------
 ;; point string rendering
 ;;------
 
 (defn render-modify-point
-  [point]
-  (let [file-path (point-path point)]
-    (-> file-path
-        rz/of-file
-        (modify-node point)
-        rz/root-string)))
+  [{:keys [::read] :as point}]
+  (-> (read point)
+      (modify-node point)
+      rz/root-string))
 
 (defn render-file-point
   [{:keys [content] :as _point}]
@@ -99,34 +103,29 @@
 
 (defn render-point
   [{:keys [modify] :as point}]
-  (if modify
-    (render-modify-point point)
-    (render-file-point point)))
+  (try
+    (*info-handler* point)
+    (if modify
+      (render-modify-point point)
+      (render-file-point point))
+    (catch Exception e
+      (*error-handler* point e))))
 
 ;;------
 ;; point writers
 ;;------
 
-(defn write-modify-point
-  "handle points that specify a modification"
-  [point]
-  (let [file-path (point-path point)]
-    (spit file-path (render-point point))))
-
-(defn write-file-point
-  "handle points that specify a whole file"
-  [point]
+(defn write-point-to-file
+  [{:keys [contents] :as point}]
   (let [file-path (point-path point)]
     (.mkdirs (java.io.File. (.getParent (java.io.File. file-path))))
-    (spit file-path (render-point point))))
+    (spit file-path contents)))
 
 (defn write-point
-  [{:keys [modify] :as point}]
+  [{:keys [::write] :as point}]
   (try
     (*info-handler* point)
-    (if modify
-      (write-modify-point point)
-      (write-file-point point))
+    (write point)
     (catch Exception e
       (*error-handler* point e))))
 
@@ -260,25 +259,53 @@
 
 (defmulti generator (fn [generator-name _data] generator-name))
 
-(defn info-logger
+(defn point-info-logger
   [point]
   (log/info (select-keys point [:id :description :destination])))
 
-(defn error-logger
+(defn point-error-logger
   [point error]
   (log/error error (select-keys point [::generator-name :destination :id])))
+
+(defn point-error-handler
+  [point error]
+  (throw (ex-info "Error handling point"
+                  (select-keys point [::generator-name :destination :id])
+                  error)))
 
 (defn mk-event-handlers
   [{:keys [::opts]}]
   (let [event-handlers (:event-handlers opts)]
     (cond
-      (= event-handlers :clojure.tools.logging) {:info  info-logger
-                                                 :error error-logger}
+      (= event-handlers :clojure.tools.logging) {:info  point-info-logger
+                                                 :error point-error-logger}
       (nil? event-handlers)                     {:info  (constantly nil)
-                                                 :error (constantly nil)}
+                                                 :error point-error-handler}
       (and (fn? (:info event-handlers))
            (fn? (:error event-handlers)))       event-handlers
       :else                                     (throw (ex-info "invalid event handlers" event-handlers)))))
+
+(defn set-read-write-opts
+  "makes reading and writeable configurable to allow testing"
+  [data]
+  (merge-with #(or %1 %2)
+              data
+              {::read  (comp rz/of-file point-path)
+               ::write write-point-to-file}))
+
+(defn test-read-write
+  "creates a reader and writer for tests"
+  [point-source-map]
+  {::read  (fn [{:keys [id]}]
+             (let [source (get point-source-map id)]
+               (if (string? source)
+                 (rz/of-string source)
+                 (-> ""
+                     (rz/of-string)
+                     (rz/append-child source)))))
+   ::write (fn [{:keys [contents] :as point}]
+             {:file-path (point-path point)
+              :contents  contents})})
 
 (defn generate
   [generator-name data]
@@ -289,12 +316,16 @@
     (dsu/validate-with-throw Generator gen)
     (binding [*info-handler*  info
               *error-handler* error]
-      (doseq [point points]
-        (write-point (-> point
-                         (assoc ::generator-name generator-name)
-                         (update :data merge generator-data data)
-                         render-point-strings
-                         render-destination-values))))))
+      (mapv (fn [point]
+              (let [updated-point (-> point
+                                      (merge {::generator-name generator-name}
+                                             (set-read-write-opts data))
+                                      (update :data merge generator-data data)
+                                      render-point-strings
+                                      render-destination-values)
+                    updated-point (assoc updated-point :contents (render-point updated-point))]
+                (write-point updated-point)))
+            points))))
 
 (comment
   (generate :donut/endpoint {:endpoint-name 'my.endpoint}))

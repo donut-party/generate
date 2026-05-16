@@ -264,13 +264,14 @@
     (sh/sh "rm" "-rf" output-directory)
     (sh/sh "cp" "-r" source-directory output-directory)
     (dg/generate :donut/endpoint {:endpoint-name 'users
-                                  :top           "generate-test"})
+                                  :top           "generate-test"
+                                  :route-prefix  "/api/v1"})
 
     (is (= "(ns generate-test.cross.endpoint-routes
   (:require [generate-test.backend.endpoint.users-endpoint :as users]))
 
 (def routes
-  [[\"{{route-prefix}}/users\"
+  [[\"/api/v1/users\"
    {:name     :users
     :ent-type :users
     :id-key   :users/id}
@@ -280,3 +281,41 @@
     (is (= "(ns generate-test.backend.endpoint.users-endpoint)
 ;; content goes here"
            (slurp (str output-directory "/generate_test/backend/endpoint/users_endpoint.clj"))))))
+
+(deftest configurable-reading-and-writing-test
+  (let [expected [{:file-path          
+                   "test-generated-files/generate_test/backend/endpoint/users_endpoint.clj",
+                   :contents
+                   "(ns generate-test.backend.endpoint.users-endpoint)
+;; content goes here"}
+
+                  {:file-path
+                   "test-generated-files/generate_test/cross/endpoint_routes.cljc",
+                   :contents
+                   "(ns x (:require [generate-test.backend.endpoint.users-endpoint :as users]))"}
+
+                  {:file-path
+                   "test-generated-files/generate_test/cross/endpoint_routes.cljc",
+                   :contents
+                   "(def routes [[\"{{route-prefix}}/users\"
+   {:name     :users
+    :ent-type :users
+    :id-key   :users/id}
+   #?(:clj users/collection-handlers)]])"}]]
+
+    (testing "works with strings"
+      (is (= expected
+             (dg/generate :donut/endpoint
+                          (merge {:endpoint-name 'users
+                                  :top           "generate-test"}
+                                 (dg/test-read-write {::add-route-ns-require "(ns x (:require))"
+                                                      ::add-route            "(def routes [])"}))))))
+
+    
+    (testing "works with forms"
+      (is (= expected
+             (dg/generate :donut/endpoint
+                          (merge {:endpoint-name 'users
+                                  :top           "generate-test"}
+                                 (dg/test-read-write {::add-route-ns-require '(ns x (:require))
+                                                      ::add-route            '(def routes [])}))))))))
