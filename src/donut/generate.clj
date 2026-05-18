@@ -53,10 +53,6 @@
              rz/next
              (get nav-substitutions p p))))
 
-(defn find-path-nav-item
-  "navigate location using a nav item"
-  [])
-
 (defn find-path
   "navigates to a location using the values in a vector"
   [loc path]
