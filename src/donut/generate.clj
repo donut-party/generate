@@ -5,7 +5,6 @@
    [clojure.tools.logging :as log]
    [clojure.walk :as walk]
    [donut.sugar.utils :as dsu]
-   [rewrite-clj.node.whitespace :as rnw]
    [rewrite-clj.zip :as rz]))
 
 (def ^:dynamic *error-handler* nil)
@@ -44,7 +43,7 @@
 
 (defn append-child-newline
   [loc _]
-  (rz/append-child loc (rnw/newlines 1)))
+  (rz/append-child loc (rz/node (rz/of-string "\n"))))
 
 (defn pred
   "Navigate tree by pred"

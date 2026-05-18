@@ -201,7 +201,7 @@
 
     (is (= "(def routes 
   [:foo 
-:bar])"
+ :bar])"
            (-> (dg/modify-node {:content {:form :bar}
                                 :modify  {:path  ['routes (dg/pred vector?)]
                                           :edits [dg/append-child-newline rz/append-child]
