@@ -217,13 +217,22 @@
 ;;---
 ;; useful for loggers
 
+(def extension-regex #"\.\w+$")
+
+(defn- strip-extension
+  [s]
+  (str/replace s extension-regex ""))
+
 (defn rendered-point-ns
   [point]
-  (-> point :destination :path ->ns))
+  (-> point :destination :path strip-extension ->ns))
 
 (defn rendered-point-file-path
   [point]
-  (-> point :destination :path ->file))
+  (let [path      (-> point :destination :path)
+        extension (re-find extension-regex path)]
+    (str (-> path strip-extension ->file)
+         extension)))
 
 ;;---
 ;; schemas

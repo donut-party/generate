@@ -323,3 +323,15 @@
                           {:read-point (dg/read-point-test-fn {::add-route-ns-require '(ns x (:require))
                                                                ::add-route            '(def routes [])})
                            :write-point dg/write-point-test}))))))
+
+;;---
+;; rendered point paths
+;;---
+
+(deftest rendered-point-ns-test
+  (is (= "my-dir.my-file"
+         (dg/rendered-point-ns {:destination {:path "my_dir/my_file.clj"}}))))
+
+(deftest rendered-point-file-path-test
+  (is (= "my_dir/my_file.clj"
+         (dg/rendered-point-file-path {:destination {:path "my_dir/my_file.clj"}}))))
