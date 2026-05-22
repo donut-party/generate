@@ -100,22 +100,22 @@
 (deftest render-destination-values-test
   (testing "uses :path directly"
     (let [point  {:destination {:path "src/myapp/core.clj"}}
-          result (#'dg/render-destination-values point {})]
+          result (#'dg/render-destination-values point)]
       (is (= "src/myapp/core.clj" (get-in result [:destination :path])))))
 
   (testing "converts :namespace to :path"
     (let [point  {:destination {:namespace "myapp.core" :extension "clj"}}
-          result (#'dg/render-destination-values point {})]
+          result (#'dg/render-destination-values point)]
       (is (= "myapp/core.clj" (get-in result [:destination :path])))))
 
   (testing "prepends :dir to :path"
     (let [point  {:destination {:path "core.clj" :dir "src"}}
-          result (#'dg/render-destination-values point {})]
+          result (#'dg/render-destination-values point)]
       (is (= "src/core.clj" (get-in result [:destination :path])))))
 
   (testing "prepends :dir to :namespace path"
     (let [point  {:destination {:namespace "myapp.core" :extension "clj" :dir "src"}}
-          result (#'dg/render-destination-values point {})]
+          result (#'dg/render-destination-values point)]
       (is (= "src/myapp/core.clj" (get-in result [:destination :path])))))
 
   (testing "throws when both :path and :namespace specified"
@@ -123,8 +123,7 @@
          clojure.lang.ExceptionInfo
          #"only specify one"
          (#'dg/render-destination-values
-          {:destination {:path "a.clj" :namespace "a.b"}}
-          {})))))
+          {:destination {:path "a.clj" :namespace "a.b"}})))))
 
 ;;---
 ;; point-path tests
@@ -146,14 +145,14 @@
                             :dir  "src"}
               :data        {:top 'my.project}}
              (#'dg/render-point-strings)
-             (#'dg/render-destination-values {}))
+             (#'dg/render-destination-values))
 
          (-> {:destination {:namespace "{{top|ns}}.cross.endpoint-routes"
                             :extension "cljc"
                             :dir       "src"}
               :data        {:top 'my.project}}
              (#'dg/render-point-strings)
-             (#'dg/render-destination-values {})))))
+             (#'dg/render-destination-values)))))
 
 ;;---
 ;; find-path

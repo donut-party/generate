@@ -202,7 +202,7 @@
 
 (defn- render-destination-values
   "renders all values in :destination value"
-  [{:keys [destination] :as point} _ctx]
+  [{:keys [destination] :as point}]
   (let [{:keys [path namespace]} destination]
     (when (and path namespace)
       (throw (ex-info "You can only specify one of :path or :namespace for a :destination"
@@ -211,6 +211,19 @@
     (assoc point :destination (cond-> {}
                                 path      (assoc :path (render-destination-path destination))
                                 namespace (assoc :path (render-destination-namespace destination))))))
+
+;;---
+;; point destination
+;;---
+;; useful for loggers
+
+(defn rendered-point-ns
+  [point]
+  (-> point :destination :path ->ns))
+
+(defn rendered-point-file-path
+  [point]
+  (-> point :destination :path ->file))
 
 ;;---
 ;; schemas
@@ -331,11 +344,11 @@
          ctx                  (init-ctx generator-name data opts)]
      (dsu/validate-with-throw Generator gen)
      (mapv (fn [point]
-             (let [ctx-w-point   (assoc ctx :point point)
-                   updated-point (-> point
+             (let [updated-point (-> point
                                      (update :data merge generator-data data)
                                      render-point-strings
-                                     (render-destination-values ctx-w-point))
+                                     render-destination-values)
+                   ctx-w-point   (assoc ctx :point updated-point)
                    updated-point (assoc updated-point :contents (render-point updated-point ctx-w-point))]
                (write-point updated-point ctx-w-point)))
            points))))
