@@ -7,9 +7,6 @@
    [donut.sugar.utils :as dsu]
    [rewrite-clj.zip :as rz]))
 
-(def ^:dynamic *error-handler* nil)
-(def ^:dynamic *info-handler* nil)
-
 ;;------
 ;; generator helpers
 ;;------
@@ -73,11 +70,13 @@
             path)))
 
 (defn edit-at-path
-  [{:keys [modify] :as point}]
+  [{:keys [modify]} {:keys [handle-error] :as ctx}]
   (let [{:keys [path edits loc node-to-insert]} modify
         modify-loc (find-path loc path)]
     (if-let [error-nav-item (::error modify-loc)]
-      (*error-handler* point (ex-info "could not navigate to loc to modify" {:nav-item error-nav-item}))
+      (handle-error (assoc ctx
+                           :event-id :edit-at-path
+                           :error (ex-info "could not navigate to loc to modify" {:nav-item error-nav-item})))
       (reduce (fn [loc edit] (edit loc node-to-insert))
               modify-loc
               edits))))
@@ -92,73 +91,55 @@
 
 (defn modify-node
   "updates a node with rewrite-clj using point"
-  [point]
+  [point ctx]
   (-> point
       assoc-modify-node-to-insert
-      edit-at-path))
+      (edit-at-path ctx)))
 
 ;;------
 ;; point string rendering
 ;;------
 
 (defn render-modify-point
-  [{:keys [::read] :as point}]
+  [point {:keys [read-point] :as ctx}]
   (-> point
-      (assoc-in [:modify :loc] (read point))
-      modify-node
+      (assoc-in [:modify :loc] (read-point point))
+      (modify-node ctx)
       rz/root-string))
 
 (defn render-file-point
-  [{:keys [content] :as _point}]
+  [{:keys [content] :as _point} _ctx]
   (let [{:keys [template form]} content]
     (if template template (str form))))
 
 (defn render-point
-  [{:keys [modify] :as point}]
-  (try
-    (*info-handler* point)
-    (if modify
-      (render-modify-point point)
-      (render-file-point point))
-    (catch Exception e
-      (*error-handler* point e))))
+  [{:keys [modify] :as point} {:keys [handle-info handle-error] :as ctx}]
+  (let [updated-ctx (assoc ctx :event-id :render-point)]
+    (try
+      (handle-info updated-ctx)
+      (if modify
+        (render-modify-point point ctx)
+        (render-file-point point ctx))
+      (catch Exception e
+        (handle-error (assoc updated-ctx :error e))))))
 
 ;;------
 ;; point writers
 ;;------
 
-(defn write-point-to-file
-  [{:keys [contents] :as point}]
-  (let [file-path (point-path point)]
-    (.mkdirs (java.io.File. (.getParent (java.io.File. file-path))))
-    (spit file-path contents)))
-
 (defn write-point
-  [{:keys [::write] :as point}]
-  (try
-    (*info-handler* point)
-    (write point)
-    (catch Exception e
-      (*error-handler* point e))))
+  [point {:keys [handle-info handle-error] :as ctx}]
+  (let [write-ctx (assoc ctx :event-id :write-point)]
+    (try
+      (handle-info write-ctx)
+      ((:write-point ctx) point)
+      (catch Exception e
+        (handle-error (assoc write-ctx :error e))))))
 
 ;;------
 ;; generators
 ;;------
 
-(comment
-  {:destination {:path   "{{top|file}}/backend/endpoint_routes.cljc"
-                 :anchor 'st:begin-ns-routes}
-   :data        {}}
-
-  {:destination {:namespace "{{top|ns}}.backend.endpoint.{{endpoint-name}}"
-                 :anchor    'st:begin-ns-routes}
-   :content     [:foo :bar]}
-
-  {:destination {:namespace "{{top|ns}}.cross.endpoint-routes"
-                 :anchor 'st:begin-ns-routes}
-   :content     "..."})
-
-;; substitution rendering
 (defn ->ns
   "Given a string or symbol, presumably representing a file path, return a string
   that represents the equivalent namespace."
@@ -221,7 +202,7 @@
 
 (defn- render-destination-values
   "renders all values in :destination value"
-  [{:keys [destination] :as point}]
+  [{:keys [destination] :as point} _ctx]
   (let [{:keys [path namespace]} destination]
     (when (and path namespace)
       (throw (ex-info "You can only specify one of :path or :namespace for a :destination"
@@ -230,6 +211,10 @@
     (assoc point :destination (cond-> {}
                                 path      (assoc :path (render-destination-path destination))
                                 namespace (assoc :path (render-destination-namespace destination))))))
+
+;;---
+;; schemas
+;;---
 
 (def Content
   [:or
@@ -269,43 +254,25 @@
    [:data-schema {:optional true} :any]
    [:data {:optional true} :map]])
 
-(defmulti generator (fn [generator-name _data] generator-name))
+;;---
+;; interface configuration
+;;---
 
-(defn point-info-logger
+;; file read/write
+(defn read-point-file
   [point]
-  (log/info (select-keys point [:id :description :destination])))
+  (-> point point-path rz/of-file))
 
-(defn point-error-logger
-  [point error]
-  (log/error error (select-keys point [::generator-name :destination :id])))
+(defn write-point-file
+  [{:keys [contents] :as point}]
+  (let [file-path (point-path point)]
+    (.mkdirs (java.io.File. (.getParent (java.io.File. file-path))))
+    (spit file-path contents)))
 
-(defn point-error-handler
-  [point error]
-  (throw (ex-info "Error handling point"
-                  (select-keys point [::generator-name :destination :id])
-                  error)))
-
-(defn mk-event-handlers
-  [{:keys [::opts]}]
-  (let [event-handlers (:event-handlers opts)]
-    (cond
-      (= event-handlers :clojure.tools.logging) {:info  point-info-logger
-                                                 :error point-error-logger}
-      (nil? event-handlers)                     {:info  (constantly nil)
-                                                 :error point-error-handler}
-      (and (fn? (:info event-handlers))
-           (fn? (:error event-handlers)))       event-handlers
-      :else                                     (throw (ex-info "invalid event handlers" event-handlers)))))
-
-(defn set-read-write-opts
-  "makes reading and writeable configurable to allow testing"
-  [data]
-  (merge-with #(or %1 %2)
-              data
-              {::read  (comp rz/of-file point-path)
-               ::write write-point-to-file}))
-
-(defn test-read-fn
+;; test read/write
+(defn read-point-test-fn
+  "produces a point reading function using point-source-map, where
+  point-source-map maps point ids to the template that should be used"
   [point-source-map]
   (fn [{:keys [id]}]
     (let [source (get point-source-map id)]
@@ -315,36 +282,63 @@
             (rz/of-string)
             (rz/append-child source))))))
 
-(defn test-write
+(defn write-point-test
   [{:keys [contents] :as point}]
   {:file-path (point-path point)
    :contents  contents})
 
-(defn test-read-write
-  "creates a reader and writer for tests"
-  [point-source-map]
-  {::read  (test-read-fn point-source-map)
-   ::write test-write})
+(defn handle-error-rethrow
+  [{:keys [error]}]
+  (throw error))
+
+(defn log-opts
+  [{:keys [point] :as opts}]
+  (-> opts
+      (select-keys [:event-id :generator-name])
+      (assoc :point-id (:id point))))
+
+(defn handle-info-log
+  [opts]
+  (log/info (log-opts opts)))
+
+(defn handle-error-log
+  [{:keys [error] :as opts}]
+  (log/error error (log-opts opts)))
+
+
+(defn init-ctx
+  [generator-name data {:keys [handle-info handle-error read-point write-point]}]
+  {:generator-name generator-name
+   :data           data
+   :handle-info    (or handle-info (constantly nil))
+   :handle-error   (or handle-error handle-error-rethrow)
+   :read-point     (or read-point read-point-file)
+   :write-point    (or write-point write-point-file)})
+
+;;---
+;; interface
+;;---
+
+(defmulti generator (fn [generator-name _data] generator-name))
 
 (defn generate
-  [generator-name data]
-  (let [{points         :points
-         generator-data :data
-         :as            gen} (generator generator-name data)
-        {:keys [info error]} (mk-event-handlers data)]
-    (dsu/validate-with-throw Generator gen)
-    (binding [*info-handler*  info
-              *error-handler* error]
-      (mapv (fn [point]
-              (let [updated-point (-> point
-                                      (merge {::generator-name generator-name}
-                                             (set-read-write-opts data))
-                                      (update :data merge generator-data data)
-                                      render-point-strings
-                                      render-destination-values)
-                    updated-point (assoc updated-point :contents (render-point updated-point))]
-                (write-point updated-point)))
-            points))))
+  ([generator-name data]
+   (generate generator-name data {}))
+  ([generator-name data opts]
+   (let [{points         :points
+          generator-data :data
+          :as            gen} (generator generator-name data)
+         ctx                  (init-ctx generator-name data opts)]
+     (dsu/validate-with-throw Generator gen)
+     (mapv (fn [point]
+             (let [ctx-w-point   (assoc ctx :point point)
+                   updated-point (-> point
+                                     (update :data merge generator-data data)
+                                     render-point-strings
+                                     (render-destination-values ctx-w-point))
+                   updated-point (assoc updated-point :contents (render-point updated-point ctx-w-point))]
+               (write-point updated-point ctx-w-point)))
+           points))))
 
 (comment
   (generate :donut/endpoint {:endpoint-name 'my.endpoint}))
