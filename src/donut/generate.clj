@@ -288,7 +288,8 @@
 (defn write-point-file
   [{:keys [contents] :as point}]
   (let [file-path (point-path point)]
-    (.mkdirs (java.io.File. (.getParent (java.io.File. file-path))))
+    (when-let [parent (.getParent (java.io.File. file-path))]
+      (.mkdirs (java.io.File. parent)))
     (spit file-path contents)))
 
 ;; test read/write
