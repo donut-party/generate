@@ -379,6 +379,18 @@
                                                                ::add-route            '(def routes [])})
                            :write-point dg/write-point-test}))))))
 
+(defmethod dg/generator :donut/deps-edn
+  [_ _]
+  {:points
+   [ ;; generate the endpoint file
+    {:id          ::deps.edn
+     :description "update deps.edn, add latest party.donut/bakery"
+     :destination {:path "deps.edn"}
+     :modify      {:path  [:deps (dg/pred map?)]
+                   :edits [dg/node-merge]}
+     :content     {:template "{party.donut/bakery {:mvn/version {{gen-lib-version}}}}"}}]
+   :data {:gen-lib-version "1.0"}})
+
 ;; cover common patterns
 (deftest patterns-test
   (testing "works with form"
@@ -412,7 +424,15 @@
                                           :loc   (rz/of-string "{:builds {:dev {}}}")}}
                                {})
                (rz/root)
-               (rn/sexpr))))))
+               (rn/sexpr)))))
+
+  (testing "works with vars in string template"
+    (is (= [{:contents "{:deps {party.donut/bakery  {:mvn/version 1.0}}}",          
+             :file-path "deps.edn"}]
+           (dg/generate :donut/deps-edn
+                        {}
+                        {:read-point  (dg/read-point-test-fn {::deps.edn '{:deps {}}})
+                         :write-point dg/write-point-test})))))
 
 ;;---
 ;; rendered point paths
