@@ -20,9 +20,19 @@
 ;; using rewrite-clj to modify source
 ;;---
 
-(defn find-value-parent
-  [loc value]
-  (rz/up (rz/find-value loc rz/next value)))
+(defn find-parent
+  [value]
+  (fn [loc]
+    (rz/up (rz/find-value loc rz/next value))))
+
+(defn find-value
+  [value]
+  (fn [loc]
+    (rz/find-value loc rz/next value)))
+
+(defn nav-item->nav-fn
+  [nav-item]
+  (find-value nav-item))
 
 (def nav-substitutions
   {::left      rz/left
@@ -58,14 +68,15 @@
   [loc path]
   (let [path (map (fn [x] (get nav-substitutions x x)) path)]
     (reduce (fn [loc nav-item]
-              (let [new-loc (if (fn? nav-item)
-                              ;; functions are rewrite-clj navigates
-                              (nav-item loc)
-                              ;; non-function values are used to navigate to that value's
-                              ;; parent. we use the value's parent because most edits are
-                              ;; meant to append to a list, vector, or map, and the value is
-                              ;; typically a symbol that's used as a kind of anchor
-                              (find-value-parent loc nav-item))]
+              (let [nav-item (if (fn? nav-item)
+                               ;; functions are rewrite-clj navigates
+                               nav-item
+                               ;; non-function values are used to navigate to that value's
+                               ;; parent. we use the value's parent because most edits are
+                               ;; meant to append to a list, vector, or map, and the value is
+                               ;; typically a symbol that's used as a kind of anchor
+                               (nav-item->nav-fn nav-item))
+                    new-loc  (nav-item loc)]
                 (if (nil? new-loc)
                   (reduced {::error nav-item})
                   new-loc)))

@@ -160,7 +160,7 @@
 ;;---
 
 (deftest rewrite-find-path-test
-  (is (= '(:require)
+  (is (= ':require
          (-> (rz/of-string "(ns foo (:require))")
              (dg/find-path '[ns :require])
              (rz/sexpr))))
@@ -178,10 +178,10 @@
   (let [root-node (rz/of-string "(def routes #_anchor [])")]
     (is (= '(def routes [])
            (-> root-node
-               (dg/find-value-parent 'routes)
+               ((dg/find-parent 'routes))
                (rz/sexpr))
            (-> root-node
-               (dg/find-value-parent 'def)
+               ((dg/find-parent 'def))
                (rz/sexpr))))))
 
 
@@ -203,7 +203,7 @@
 
     (is (= "(def routes 
   [:foo 
- :bar])"
+:bar])"
            (-> (dg/modify-node {:content {:form :bar}
                                 :modify  {:path  ['routes (dg/pred vector?)]
                                           :edits [dg/append-child-newline rz/append-child]
@@ -292,7 +292,7 @@
        :description "adds a ns alias to :require"
        :destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
                      :dir  "test-generated-files"}
-       :modify      {:path  ['ns :require]
+       :modify      {:path  ['ns (dg/find-parent :require)]
                      :edits [rz/append-child]}
        :content     {:form [endpoint-ns :as endpoint-name]}}
 
@@ -407,7 +407,7 @@
   (testing "works with path and edits"
     (is (= {:builds {:dev {} :bakery {}}}
            (-> (dg/modify-node {:content {:form {:bakery {}}}
-                                :modify  {:path  [:builds (dg/pred map?)]
+                                :modify  {:path  [(dg/find-value :builds) (dg/pred map?)]
                                           :edits [dg/node-merge]
                                           :loc   (rz/of-string "{:builds {:dev {}}}")}}
                                {})
