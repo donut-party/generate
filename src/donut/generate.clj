@@ -5,6 +5,7 @@
    [clojure.tools.logging :as log]
    [clojure.walk :as walk]
    [donut.sugar.utils :as dsu]
+   [rewrite-clj.node :as rn]
    [rewrite-clj.zip :as rz]))
 
 ;;------
@@ -39,8 +40,10 @@
    vector?     rz/vector?})
 
 (defn append-child-newline
-  [loc _]
-  (rz/append-child loc (rz/node (rz/of-string "\n"))))
+  ([loc]
+   (rz/append-child loc (rz/node (rz/of-string "\n"))))
+  ([loc _]
+   (append-child-newline loc)))
 
 (defn pred
   "Navigate tree by pred"
@@ -81,12 +84,23 @@
               modify-loc
               edits))))
 
+(defn node-merge
+  "merges in all nodes from a map into loc"
+  [loc map-node]
+  (let [mloc (rz/of-node map-node)]
+    (loop [loc loc
+           navigated-map (rz/next mloc)]
+      (if (rz/end? navigated-map)
+        loc
+        (recur (rz/append-child loc (rz/node navigated-map))
+               (rz/right* navigated-map))))))
+
 (defn assoc-modify-node-to-insert
   [{:keys [content] :as point}]
   (let [{:keys [template form]} content
         node-to-insert          (if template
                                   (rz/node (rz/of-string template))
-                                  form)]
+                                  (rn/coerce form))]
     (assoc-in point [:modify :node-to-insert] node-to-insert)))
 
 (defn modify-node

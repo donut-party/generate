@@ -211,6 +211,34 @@
                                {})
                (rz/root-string))))))
 
+
+;; TODO needs to work with template and with form
+(deftest node-merge-test
+  (testing "works with template"
+    (is (= "(def kvs {:foo  {:x :y} 
+:bar  {:a :b}})"
+           (-> (dg/modify-node {:content {:template "{:foo {:x :y}
+:bar {:a :b}}"}
+                                :modify  {:path  ['kvs (dg/pred map?)]
+                                          :edits [dg/node-merge]
+                                          :loc   (rz/of-string "(def kvs {})")}}
+                               {})
+               (rz/root)
+               (rz/of-node)
+               (rz/string)))))
+
+  (testing "works with form"
+    (is (= "(def kvs {:foo  {:x :y} , :bar  {:a :b}})"
+           (-> (dg/modify-node {:content {:form {:foo {:x :y}
+                                                 :bar {:a :b}}}
+                                :modify  {:path  ['kvs (dg/pred map?)]
+                                          :edits [dg/node-merge]
+                                          :loc   (rz/of-string "(def kvs {})")}}
+                               {})
+               (rz/root)
+               (rz/of-node)
+               (rz/string))))))
+
 ;;--- 
 ;; testing an actual generator
 ;;--- 
@@ -222,7 +250,7 @@
                                  endpoint-name
                                  "-endpoint"))]
     {:points
-     [;; generate the endpoint file
+     [ ;; generate the endpoint file
       {:id          ::endpoint-file
        :description "writes endpoint file"
        :destination {:namespace "{{endpoint-ns}}"
