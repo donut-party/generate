@@ -3,6 +3,7 @@
    [clojure.java.shell :as sh]
    [clojure.test :refer [deftest is testing]]
    [donut.generate :as dg]
+   [rewrite-clj.node :as rn]
    [rewrite-clj.zip :as rz]))
 
 ;;---
@@ -229,7 +230,7 @@
 
 
     (is (= "(def kvs {:a :b 
- :foo  {:x :y} 
+:foo  {:x :y} 
 :bar  {:a :b}})"
            (-> (dg/modify-node {:content {:template "{:foo {:x :y}
 :bar {:a :b}}"}
@@ -254,7 +255,7 @@
                (rz/string))))
 
     (is (= "(def kvs {:a :b 
- :foo  {:x :y} , :bar  {:a :b}})"
+:foo  {:x :y} , :bar  {:a :b}})"
            (-> (dg/modify-node {:content {:form {:foo {:x :y}
                                                  :bar {:a :b}}}
                                 :modify  {:path  ['kvs (dg/pred map?)]
@@ -377,6 +378,41 @@
                           {:read-point (dg/read-point-test-fn {::add-route-ns-require '(ns x (:require))
                                                                ::add-route            '(def routes [])})
                            :write-point dg/write-point-test}))))))
+
+;; cover common patterns
+(deftest patterns-test
+  (testing "works with form"
+    (is (= "(def kvs {:foo  {:x :y} , :bar  {:a :b}})"
+           (-> (dg/modify-node {:content {:form {:foo {:x :y}
+                                                 :bar {:a :b}}}
+                                :modify  {:path  ['kvs (dg/pred map?)]
+                                          :edits [dg/node-merge]
+                                          :loc   (rz/of-string "(def kvs {})")}}
+                               {})
+               (rz/root)
+               (rz/of-node)
+               (rz/string)))))
+
+  (testing "works with form"
+    (is (= "(def kvs {:foo  {}})"
+           (-> (dg/modify-node {:content {:form {:foo {}}}
+                                :modify  {:path  ['kvs (dg/pred map?)]
+                                          :edits [dg/node-merge]
+                                          :loc   (rz/of-string "(def kvs {})")}}
+                               {})
+               (rz/root)
+               (rz/of-node)
+               (rz/string)))))
+  
+  (testing "works with path and edits"
+    (is (= {:builds {:dev {} :bakery {}}}
+           (-> (dg/modify-node {:content {:form {:bakery {}}}
+                                :modify  {:path  [:builds (dg/pred map?)]
+                                          :edits [dg/node-merge]
+                                          :loc   (rz/of-string "{:builds {:dev {}}}")}}
+                               {})
+               (rz/root)
+               (rn/sexpr))))))
 
 ;;---
 ;; rendered point paths

@@ -41,7 +41,7 @@
 
 (defn append-child-newline
   ([loc]
-   (rz/append-child loc (rz/node (rz/of-string "\n"))))
+   (rz/append-child loc (rn/newlines 1)))
   ([loc _]
    (append-child-newline loc)))
 
@@ -87,14 +87,11 @@
 (defn node-merge
   "merges in all nodes from a map into loc"
   [loc map-node]
-  (let [mloc        (rz/of-node map-node)
+  (let [mloc (rz/of-node map-node)
         initial-loc (if (empty? (rz/sexpr loc)) loc (append-child-newline loc))]
-    (loop [loc           initial-loc
-           navigated-map (rz/next mloc)]
-      (if (rz/end? navigated-map)
-        loc
-        (recur (rz/append-child loc (rz/node navigated-map))
-               (rz/right* navigated-map))))))
+    (reduce rz/append-child
+            initial-loc
+            (rn/children map-node))))
 
 (defn assoc-modify-node-to-insert
   [{:keys [content] :as point}]
