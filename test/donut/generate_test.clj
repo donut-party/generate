@@ -434,6 +434,23 @@
                         {:read-point  (dg/read-point-test-fn {::deps.edn '{:deps {}}})
                          :write-point dg/write-point-test})))))
 
+(deftest upsert-vector-key-test
+  (is (= {:foo [:bar]}
+         (-> (dg/modify-node {:modify  {:path  [(dg/pred map?)]
+                                        :edits [(dg/upsert-vector-key :foo :bar)]
+                                        :loc   (rz/of-string "{}")}}
+                             {})
+             (rz/root)
+             (rn/sexpr))))
+
+  (is (= {:foo [:bar :baz]}
+         (-> (dg/modify-node {:modify  {:path  [(dg/pred map?)]
+                                        :edits [(dg/upsert-vector-key :foo :baz)]
+                                        :loc   (rz/of-string "{:foo [:bar]}")}}
+                             {})
+             (rz/root)
+             (rn/sexpr)))))
+
 ;;---
 ;; rendered point paths
 ;;---

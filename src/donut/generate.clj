@@ -17,7 +17,7 @@
   (get-in point [:destination :path]))
 
 ;;---
-;; using rewrite-clj to modify source
+;; nav
 ;;---
 
 (defn find-parent
@@ -49,12 +49,6 @@
    set?        rz/set?
    vector?     rz/vector?})
 
-(defn append-child-newline
-  ([loc]
-   (rz/append-child loc (rn/newlines 1)))
-  ([loc _]
-   (append-child-newline loc)))
-
 (defn pred
   "Navigate tree by pred"
   [p]
@@ -83,6 +77,16 @@
             loc
             path)))
 
+;;---
+;; modification
+;;---
+
+(defn append-child-newline
+  ([loc]
+   (rz/append-child loc (rn/newlines 1)))
+  ([loc _]
+   (append-child-newline loc)))
+
 (defn edit-at-path
   [{:keys [modify]} {:keys [handle-error] :as ctx}]
   (let [{:keys [path edits loc node-to-insert]} modify
@@ -95,11 +99,33 @@
               modify-loc
               edits))))
 
+(defn append-to-vector-child [zloc value]
+  (-> zloc
+      (rz/append-child (rn/spaces 1))
+      (rz/append-child (rn/coerce value))
+      (rz/append-child (rn/spaces 1))))
+
+(defn upsert-vector-key
+  ([k value]
+   (fn [loc _]
+     (upsert-vector-key loc k value)))
+  ([zloc k value]
+   (if-let [key-loc (rz/find-value (rz/down zloc) rz/right k)]
+     ;; key exists — navigate to the vector and append to it
+     (-> key-loc
+         rz/right        ; move to the vector value
+         (append-to-vector-child value))
+     ;; key missing — append :x [value] to the map
+     (-> zloc
+         (rz/append-child (rn/newlines 1))
+         (rz/append-child (rn/coerce k))
+         (rz/append-child (rn/spaces 1))
+         (rz/append-child (rn/coerce [value]))))))
+
 (defn node-merge
   "merges in all nodes from a map into loc"
   [loc map-node]
-  (let [mloc (rz/of-node map-node)
-        initial-loc (if (empty? (rz/sexpr loc)) loc (append-child-newline loc))]
+  (let [initial-loc (if (empty? (rz/sexpr loc)) loc (append-child-newline loc))]
     (reduce rz/append-child
             initial-loc
             (rn/children map-node))))
