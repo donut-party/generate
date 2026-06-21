@@ -87,8 +87,9 @@
 (defn node-merge
   "merges in all nodes from a map into loc"
   [loc map-node]
-  (let [mloc (rz/of-node map-node)]
-    (loop [loc loc
+  (let [mloc        (rz/of-node map-node)
+        initial-loc (if (empty? (rz/sexpr loc)) loc (append-child-newline loc))]
+    (loop [loc           initial-loc
            navigated-map (rz/next mloc)]
       (if (rz/end? navigated-map)
         loc

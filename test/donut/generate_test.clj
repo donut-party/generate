@@ -225,6 +225,20 @@
                                {})
                (rz/root)
                (rz/of-node)
+               (rz/string))))
+
+
+    (is (= "(def kvs {:a :b 
+ :foo  {:x :y} 
+:bar  {:a :b}})"
+           (-> (dg/modify-node {:content {:template "{:foo {:x :y}
+:bar {:a :b}}"}
+                                :modify  {:path  ['kvs (dg/pred map?)]
+                                          :edits [dg/node-merge]
+                                          :loc   (rz/of-string "(def kvs {:a :b})")}}
+                               {})
+               (rz/root)
+               (rz/of-node)
                (rz/string)))))
 
   (testing "works with form"
@@ -234,6 +248,18 @@
                                 :modify  {:path  ['kvs (dg/pred map?)]
                                           :edits [dg/node-merge]
                                           :loc   (rz/of-string "(def kvs {})")}}
+                               {})
+               (rz/root)
+               (rz/of-node)
+               (rz/string))))
+
+    (is (= "(def kvs {:a :b 
+ :foo  {:x :y} , :bar  {:a :b}})"
+           (-> (dg/modify-node {:content {:form {:foo {:x :y}
+                                                 :bar {:a :b}}}
+                                :modify  {:path  ['kvs (dg/pred map?)]
+                                          :edits [dg/node-merge]
+                                          :loc   (rz/of-string "(def kvs {:a :b})")}}
                                {})
                (rz/root)
                (rz/of-node)
