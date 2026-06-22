@@ -1,7 +1,8 @@
 {:paths ["src" "resources"]
  :deps  {org.clojure/tools.logging {:mvn/version "1.3.1"}
          party.donut/sugar         {:mvn/version "0.0.22"}
-         rewrite-clj/rewrite-clj   {:mvn/version "1.2.54"}}
+         rewrite-clj/rewrite-clj   {:mvn/version "1.2.54"}
+         clj-kondo/clj-kondo       {:mvn/version "2025.10.23"}}
 
  :aliases
  {:dev

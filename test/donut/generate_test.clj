@@ -451,6 +451,25 @@
              (rz/root)
              (rn/sexpr)))))
 
+(deftest upsert-vector-key-alias-test
+  (testing "resolves auto-resolving current-ns keywords via clj-kondo"
+    (is (= "(ns my.app)\n{::foo [:bar]}"
+           (-> (dg/modify-node {:modify  {:path  [(dg/pred map?)]
+                                          :edits [(dg/upsert-vector-key :my.app/foo :bar)]
+                                          :loc   (rz/of-string "(ns my.app)\n{::foo []}")}}
+                               {})
+               (rz/root)
+               (rn/string)))))
+
+  (testing "resolves aliased namespaced keywords via clj-kondo"
+    (is (= "(ns my.app\n  (:require [some.lib :as lib]))\n{::lib/foo [:bar]}"
+           (-> (dg/modify-node {:modify  {:path  [(dg/pred map?)]
+                                          :edits [(dg/upsert-vector-key :some.lib/foo :bar)]
+                                          :loc   (rz/of-string "(ns my.app\n  (:require [some.lib :as lib]))\n{::lib/foo []}")}}
+                               {})
+               (rz/root)
+               (rn/string))))))
+
 ;;---
 ;; rendered point paths
 ;;---

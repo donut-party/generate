@@ -1,6 +1,7 @@
 (ns donut.generate
   "Write code generators that can be executed from the REPL"
   (:require
+   [clj-kondo.core :as clj-kondo]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
    [clojure.walk :as walk]
@@ -100,17 +101,62 @@
               edits))))
 
 (defn append-to-vector-child [zloc value]
-  (-> zloc
-      (rz/append-child (rn/spaces 1))
-      (rz/append-child (rn/coerce value))
-      (rz/append-child (rn/spaces 1))))
+  ;; append-child handles the separating whitespace: a space before the value when
+  ;; the vector is non-empty, nothing when it's empty
+  (rz/append-child zloc (rn/coerce value)))
+
+(defn- kondo-keyword-context
+  "Uses clj-kondo to analyze `source` and return the data needed to resolve
+  auto-resolving (`::foo`) and aliased (`::lib/foo`) namespaced keywords: the
+  file's current namespace and its require aliases (alias -> namespace)."
+  [source]
+  (let [file (java.io.File/createTempFile "donut-generate" ".clj")]
+    (try
+      (spit file source)
+      (let [{:keys [namespace-definitions namespace-usages]}
+            (:analysis (clj-kondo/run! {:lint   [(.getPath file)]
+                                        :config {:output {:analysis {:keywords true}}}}))]
+        {:current-ns (some-> namespace-definitions first :name str)
+         :aliases    (reduce (fn [m {:keys [alias to]}]
+                               (cond-> m alias (assoc (str alias) (str to))))
+                             {}
+                             namespace-usages)})
+      (finally
+        (.delete file)))))
+
+(defn- resolve-keyword-node
+  "Resolves a rewrite-clj keyword `node` to the fully-qualified keyword it
+  denotes, expanding auto-resolving and aliased namespaced keywords using the
+  clj-kondo `ctx` produced by `kondo-keyword-context`."
+  [node {:keys [current-ns aliases]}]
+  (let [k (:k node)]
+    (if (:auto-resolved? node)
+      (if-let [alias (namespace k)]
+        (keyword (get aliases alias alias) (name k))
+        (keyword current-ns (name k)))
+      k)))
+
+(defn- find-key-loc
+  "Finds the loc of the map key matching keyword `k`, resolving auto-resolving and
+  aliased namespaced keywords in the source against `k`."
+  [zloc k]
+  (let [ctx (kondo-keyword-context (rz/root-string zloc))]
+    (rz/find (rz/down zloc)
+             rz/right
+             (fn [loc]
+               (let [node (rz/node loc)]
+                 (and (rn/keyword-node? node)
+                      (= k (resolve-keyword-node node ctx))))))))
 
 (defn upsert-vector-key
+  ([k]
+   (fn [loc value]
+     (upsert-vector-key loc k value)))
   ([k value]
    (fn [loc _]
      (upsert-vector-key loc k value)))
   ([zloc k value]
-   (if-let [key-loc (rz/find-value (rz/down zloc) rz/right k)]
+   (if-let [key-loc (find-key-loc zloc k)]
      ;; key exists — navigate to the vector and append to it
      (-> key-loc
          rz/right        ; move to the vector value
