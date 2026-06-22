@@ -79,12 +79,58 @@
             path)))
 
 ;;---
+;; whitespace / indentation
+;;---
+
+(defn- node-width
+  [node]
+  (count (rn/string node)))
+
+(defn- delimiter-width
+  "How far a node's children are inset from its own start, i.e. the width of its
+  opening delimiter. The root `:forms` node has no delimiter."
+  [node]
+  (case (rn/tag node)
+    :forms 0
+    :set   2
+    1))
+
+(defn- loc-column
+  "The 0-based column at which `loc`'s node begins. Computed from the tree using
+  whitespace-aware navigation, so it works without position tracking: walk left
+  siblings back to the start of the line, then recur up through parents."
+  [loc]
+  (loop [l   (rz/left* loc)
+         col 0]
+    (cond
+      (nil? l)
+      (if-let [parent (rz/up* loc)]
+        (+ (loc-column parent) (delimiter-width (rz/node parent)) col)
+        col)
+
+      (= :newline (rn/tag (rz/node l)))
+      col
+
+      :else
+      (recur (rz/left* l) (+ col (node-width (rz/node l)))))))
+
+(defn- child-indent
+  "Spaces needed to align a new line with the first child of collection `loc`."
+  [loc]
+  (inc (loc-column loc)))
+
+;;---
 ;; modification
 ;;---
 
 (defn append-child-newline
+  "Appends a newline followed by indentation that aligns the next child with the
+  collection's existing contents. Uses the raw `append-child*` for the whitespace
+  so no spurious separator is inserted before the newline."
   ([loc]
-   (rz/append-child loc (rn/newlines 1)))
+   (-> loc
+       (rz/append-child* (rn/newlines 1))
+       (rz/append-child* (rn/spaces (child-indent loc)))))
   ([loc _]
    (append-child-newline loc)))
 
@@ -161,18 +207,27 @@
      (-> key-loc
          rz/right        ; move to the vector value
          (append-to-vector-child value))
-     ;; key missing — append :x [value] to the map
-     (-> zloc
-         (rz/append-child (rn/newlines 1))
+     ;; key missing — append :x [value], on an aligned new line when the map is
+     ;; non-empty; append-child supplies the space between key and value
+     (-> (if (empty? (rz/sexpr zloc)) zloc (append-child-newline zloc))
          (rz/append-child (rn/coerce k))
-         (rz/append-child (rn/spaces 1))
          (rz/append-child (rn/coerce [value]))))))
 
 (defn node-merge
-  "merges in all nodes from a map into loc"
+  "merges in all nodes from a map into loc, re-indenting continuation lines so they
+  align with the collection's contents. Horizontal separators are left to
+  `rz/append-child` rather than copied from the source, so spacing stays single."
   [loc map-node]
-  (let [initial-loc (if (empty? (rz/sexpr loc)) loc (append-child-newline loc))]
-    (reduce rz/append-child
+  (let [indent      (child-indent loc)
+        initial-loc (if (empty? (rz/sexpr loc)) loc (append-child-newline loc))]
+    (reduce (fn [loc child]
+              (case (rn/tag child)
+                :newline    (-> loc
+                                (rz/append-child* child)
+                                (rz/append-child* (rn/spaces indent)))
+                ;; drop source whitespace/commas; append-child re-inserts separators
+                (:whitespace :comma) loc
+                (rz/append-child loc child)))
             initial-loc
             (rn/children map-node))))
 

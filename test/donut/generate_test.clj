@@ -202,8 +202,8 @@
                (rz/sexpr))))
 
     (is (= "(def routes 
-  [:foo 
-:bar])"
+  [:foo
+   :bar])"
            (-> (dg/modify-node {:content {:form :bar}
                                 :modify  {:path  ['routes (dg/pred vector?)]
                                           :edits [dg/append-child-newline rz/append-child]
@@ -216,8 +216,8 @@
 ;; TODO needs to work with template and with form
 (deftest node-merge-test
   (testing "works with template"
-    (is (= "(def kvs {:foo  {:x :y} 
-:bar  {:a :b}})"
+    (is (= "(def kvs {:foo {:x :y}
+          :bar {:a :b}})"
            (-> (dg/modify-node {:content {:template "{:foo {:x :y}
 :bar {:a :b}}"}
                                 :modify  {:path  ['kvs (dg/pred map?)]
@@ -229,9 +229,9 @@
                (rz/string))))
 
 
-    (is (= "(def kvs {:a :b 
-:foo  {:x :y} 
-:bar  {:a :b}})"
+    (is (= "(def kvs {:a :b
+          :foo {:x :y}
+          :bar {:a :b}})"
            (-> (dg/modify-node {:content {:template "{:foo {:x :y}
 :bar {:a :b}}"}
                                 :modify  {:path  ['kvs (dg/pred map?)]
@@ -243,7 +243,7 @@
                (rz/string)))))
 
   (testing "works with form"
-    (is (= "(def kvs {:foo  {:x :y} , :bar  {:a :b}})"
+    (is (= "(def kvs {:foo {:x :y} :bar {:a :b}})"
            (-> (dg/modify-node {:content {:form {:foo {:x :y}
                                                  :bar {:a :b}}}
                                 :modify  {:path  ['kvs (dg/pred map?)]
@@ -254,8 +254,8 @@
                (rz/of-node)
                (rz/string))))
 
-    (is (= "(def kvs {:a :b 
-:foo  {:x :y} , :bar  {:a :b}})"
+    (is (= "(def kvs {:a :b
+          :foo {:x :y} :bar {:a :b}})"
            (-> (dg/modify-node {:content {:form {:foo {:x :y}
                                                  :bar {:a :b}}}
                                 :modify  {:path  ['kvs (dg/pred map?)]
@@ -394,7 +394,7 @@
 ;; cover common patterns
 (deftest patterns-test
   (testing "works with form"
-    (is (= "(def kvs {:foo  {:x :y} , :bar  {:a :b}})"
+    (is (= "(def kvs {:foo {:x :y} :bar {:a :b}})"
            (-> (dg/modify-node {:content {:form {:foo {:x :y}
                                                  :bar {:a :b}}}
                                 :modify  {:path  ['kvs (dg/pred map?)]
@@ -406,7 +406,7 @@
                (rz/string)))))
 
   (testing "works with form"
-    (is (= "(def kvs {:foo  {}})"
+    (is (= "(def kvs {:foo {}})"
            (-> (dg/modify-node {:content {:form {:foo {}}}
                                 :modify  {:path  ['kvs (dg/pred map?)]
                                           :edits [dg/node-merge]
@@ -427,7 +427,7 @@
                (rn/sexpr)))))
 
   (testing "works with vars in string template"
-    (is (= [{:contents "{:deps {party.donut/bakery  {:mvn/version 1.0}}}",          
+    (is (= [{:contents "{:deps {party.donut/bakery {:mvn/version 1.0}}}",
              :file-path "deps.edn"}]
            (dg/generate :donut/deps-edn
                         {}
