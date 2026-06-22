@@ -58,3 +58,9 @@
     (dd/deploy {:installer :remote :artifact (b/resolve-path jar-file)
                 :pom-file (b/pom-path (select-keys opts [:lib :class-dir]))}))
   opts)
+
+(defn install [opts]
+  (let [opts (jar-opts opts)]
+    (jar opts)
+    (b/install opts)
+    (println version)))
