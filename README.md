@@ -174,7 +174,7 @@ Example:
    :points [{:destination {:path "src/myapp/routes.cljc"}
              :content     {:template "{{route-name}}"}
              :modify      {:path  ['routes (dg/pred vector?)]
-                           :edits [dg/append-newline-child rz/append-child]}}]})
+                           :edits [dg/append-child-newline rz/append-child]}}]})
 ```
 
 Assuming routes.cljc contains this form:
@@ -192,10 +192,62 @@ When you call generate, this is what happens:
 ;; updated routes.cljc:
 (def routes
   [:route-1
-:boop])
+   :boop])
 ```
 
-Notice that the new entry isn't indented properly. 🤷‍♂️
+The new entry is indented to align with the existing contents.
+
+### JSON File Modification
+
+When a `:modify` point targets a `.json` file, `donut.generate` edits it with
+[cheshire](https://github.com/dakrone/cheshire) instead of rewrite-clj. The file
+is parsed into Clojure data, the point's `:edits` transform the data found at
+`:path`, and the result is written back out as pretty-printed JSON.
+
+Because the parsed JSON is ordinary Clojure data, the `:edits` are plain data
+functions — each is called as `(edit value-at-path content)`:
+
+| key      | description                                                                                   |
+|----------|-----------------------------------------------------------------------------------------------|
+| `:path`  | key path into the parsed JSON (`update-in`-style); an empty path `[]` edits the whole document |
+| `:edits` | data functions applied to the value at `:path`, e.g. `merge`, `conj`, `assoc`                  |
+
+The value threaded into each edit comes from `:content`: a `:form` (Clojure
+data) or a `:template` (a JSON string, which may use `{{...}}` substitutions).
+
+Example — add a script and a keyword to a `package.json`:
+
+``` clojure
+(defmethod dg/generator :package-json [_ data]
+  {:data   data
+   :points [{:destination {:path "package.json"}
+             :modify      {:path [:scripts] :edits [merge]}
+             :content     {:form {:test "jest"}}}
+            {:destination {:path "package.json"}
+             :modify      {:path [:keywords] :edits [conj]}
+             :content     {:form "donut"}}]})
+```
+
+Assuming package.json contains:
+
+``` json
+{
+  "scripts" : { "build" : "tsc" },
+  "keywords" : [ "cli" ]
+}
+```
+
+Running the generator updates it to:
+
+``` json
+{
+  "scripts" : {
+    "build" : "tsc",
+    "test" : "jest"
+  },
+  "keywords" : [ "cli", "donut" ]
+}
+```
 
 ## Usage
 
@@ -246,6 +298,8 @@ Multimethod to register a generator. Return a map of `:points` and optionally `:
 ## Dependencies
 
 - [`rewrite-clj`](https://github.com/clj-commons/rewrite-clj) — for non-destructive source file modification
+- [`clj-kondo`](https://github.com/clj-kondo/clj-kondo) — for resolving namespaced keywords (auto-resolved and aliased) when editing Clojure files
+- [`cheshire`](https://github.com/dakrone/cheshire) — for editing JSON files
 
 ## Next steps
 

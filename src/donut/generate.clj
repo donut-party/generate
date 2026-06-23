@@ -1,6 +1,7 @@
 (ns donut.generate
-  "Write code generators that can be executed from the REPL"
+  "Write code generators that can be executed from the REPL or bb"
   (:require
+   [cheshire.core :as json]
    [clj-kondo.core :as clj-kondo]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
@@ -262,14 +263,53 @@
   (let [{:keys [template form]} content]
     (if template template (str form))))
 
+;;------
+;; json point modification
+;;------
+;; Where Clojure files are edited as rewrite-clj trees, JSON files are edited as
+;; ordinary parsed data: cheshire turns the file into Clojure maps/vectors, the
+;; point's :edits transform the data at :path, and cheshire renders it back out.
+;; Because the data is plain Clojure, the :edits are plain data fns — `merge`,
+;; `conj`, `assoc`, etc. — each called as (edit value-at-path node-to-insert).
+
+(defn json-node-to-insert
+  "Resolves a point's :content to the data inserted into the JSON: a :template is
+  parsed as JSON, a :form is used as-is."
+  [{:keys [content]}]
+  (let [{:keys [template form]} content]
+    (if template
+      (json/parse-string template true)
+      form)))
+
+(defn edit-json-at-path
+  "Applies `edits` to the value found at `path` within parsed JSON `data`, threading
+  `node` through each edit. An empty path edits the whole document."
+  [data path edits node]
+  (let [apply-edits (fn [value] (reduce (fn [value edit] (edit value node)) value edits))]
+    (if (seq path)
+      (update-in data path apply-edits)
+      (apply-edits data))))
+
+(defn render-json-modify-point
+  [{:keys [modify] :as point} {:keys [read-json-point] :as _ctx}]
+  (-> (read-json-point point)
+      (edit-json-at-path (:path modify) (:edits modify) (json-node-to-insert point))
+      (json/generate-string {:pretty true})))
+
+(defn json-point?
+  "true when a point's destination is a .json file"
+  [point]
+  (boolean (some-> point point-path (str/ends-with? ".json"))))
+
 (defn render-point
   [{:keys [modify] :as point} {:keys [handle-info handle-error] :as ctx}]
   (let [updated-ctx (assoc ctx :event-id :render-point)]
     (try
       (handle-info updated-ctx)
-      (if modify
-        (render-modify-point point ctx)
-        (render-file-point point ctx))
+      (cond
+        (and modify (json-point? point)) (render-json-modify-point point ctx)
+        modify                           (render-modify-point point ctx)
+        :else                            (render-file-point point ctx))
       (catch Exception e
         (handle-error (assoc updated-ctx :error e))))))
 
@@ -435,6 +475,10 @@
   [point]
   (-> point point-path rz/of-file))
 
+(defn read-json-point-file
+  [point]
+  (-> point point-path slurp (json/parse-string true)))
+
 (defn write-point-file
   [{:keys [contents] :as point}]
   (let [file-path (point-path point)]
@@ -454,6 +498,16 @@
         (-> ""
             (rz/of-string)
             (rz/append-child source))))))
+
+(defn read-json-point-test-fn
+  "like read-point-test-fn but for JSON points: maps point ids to a JSON string or
+  to already-parsed Clojure data"
+  [point-source-map]
+  (fn [{:keys [id]}]
+    (let [source (get point-source-map id)]
+      (if (string? source)
+        (json/parse-string source true)
+        source))))
 
 (defn write-point-test
   [{:keys [contents] :as point}]
@@ -480,13 +534,14 @@
 
 
 (defn init-ctx
-  [generator-name data {:keys [handle-info handle-error read-point write-point]}]
-  {:generator-name generator-name
-   :data           data
-   :handle-info    (or handle-info (constantly nil))
-   :handle-error   (or handle-error handle-error-rethrow)
-   :read-point     (or read-point read-point-file)
-   :write-point    (or write-point write-point-file)})
+  [generator-name data {:keys [handle-info handle-error read-point read-json-point write-point]}]
+  {:generator-name  generator-name
+   :data            data
+   :handle-info     (or handle-info (constantly nil))
+   :handle-error    (or handle-error handle-error-rethrow)
+   :read-point      (or read-point read-point-file)
+   :read-json-point (or read-json-point read-json-point-file)
+   :write-point     (or write-point write-point-file)})
 
 ;;---
 ;; interface

@@ -471,6 +471,54 @@
                (rn/string))))))
 
 ;;---
+;; json edit generation
+;;---
+
+(defmethod dg/generator :donut/package-json
+  [_ _]
+  {:points
+   [ ;; merge a map into a nested json object
+    {:id          ::json-add-script
+     :description "add a test script to package.json"
+     :destination {:path "package.json"}
+     :modify      {:path  [:scripts]
+                   :edits [merge]}
+     :content     {:form {:test "jest"}}}
+
+    ;; append a value to a json array
+    {:id          ::json-add-keyword
+     :description "append a keyword to package.json"
+     :destination {:path "package.json"}
+     :modify      {:path  [:keywords]
+                   :edits [conj]}
+     :content     {:form "donut"}}
+
+    ;; merge top-level keys from a json template
+    {:id          ::json-merge-root
+     :description "merge top-level keys into package.json"
+     :destination {:path "package.json"}
+     :modify      {:path  []
+                   :edits [merge]}
+     :content     {:template "{\"license\": \"{{license}}\"}"}}]
+   :data {:license "MIT"}})
+
+(deftest json-edit-generation-test
+  (testing "edits json files with cheshire: merge into objects, append to arrays,
+            and merge from a substituted template"
+    (is (= [{:file-path "package.json"
+             :contents  "{\n  \"scripts\" : {\n    \"build\" : \"tsc\",\n    \"test\" : \"jest\"\n  }\n}"}
+            {:file-path "package.json"
+             :contents  "{\n  \"name\" : \"app\",\n  \"keywords\" : [ \"cli\", \"donut\" ]\n}"}
+            {:file-path "package.json"
+             :contents  "{\n  \"name\" : \"app\",\n  \"license\" : \"MIT\"\n}"}]
+           (dg/generate :donut/package-json {}
+                        {:read-json-point (dg/read-json-point-test-fn
+                                           {::json-add-script  "{\"scripts\": {\"build\": \"tsc\"}}"
+                                            ::json-add-keyword "{\"name\": \"app\", \"keywords\": [\"cli\"]}"
+                                            ::json-merge-root  "{\"name\": \"app\"}"})
+                         :write-point     dg/write-point-test})))))
+
+;;---
 ;; rendered point paths
 ;;---
 
