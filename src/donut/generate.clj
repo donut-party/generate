@@ -204,12 +204,12 @@
      (upsert-vector-key loc k value)))
   ([zloc k value]
    (if-let [key-loc (find-key-loc zloc k)]
-     ;; key exists — navigate to the vector and append to it
+     ;; key exists, so navigate to the vector and append to it
      (-> key-loc
          rz/right        ; move to the vector value
          (append-to-vector-child value))
-     ;; key missing — append :x [value], on an aligned new line when the map is
-     ;; non-empty; append-child supplies the space between key and value
+     ;; key missing, so append :x [value]. A non-empty map gets an aligned new
+     ;; line first; append-child supplies the space between key and value
      (-> (if (empty? (rz/sexpr zloc)) zloc (append-child-newline zloc))
          (rz/append-child (rn/coerce k))
          (rz/append-child (rn/coerce [value]))))))
@@ -266,11 +266,11 @@
 ;;------
 ;; json point modification
 ;;------
-;; Where Clojure files are edited as rewrite-clj trees, JSON files are edited as
+;; Clojure files are edited as rewrite-clj trees. JSON files are edited as
 ;; ordinary parsed data: cheshire turns the file into Clojure maps/vectors, the
 ;; point's :edits transform the data at :path, and cheshire renders it back out.
-;; Because the data is plain Clojure, the :edits are plain data fns — `merge`,
-;; `conj`, `assoc`, etc. — each called as (edit value-at-path node-to-insert).
+;; Since the data is plain Clojure, the :edits are plain data fns like `merge`,
+;; `conj`, and `assoc`. Each one is called as (edit value-at-path node-to-insert).
 
 (defn json-node-to-insert
   "Resolves a point's :content to the data inserted into the JSON: a :template is
