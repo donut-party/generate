@@ -24,13 +24,13 @@
 
 (defn find-parent
   [value]
-  (fn [loc]
-    (rz/up (rz/find-value loc rz/next value))))
+  (fn [zloc]
+    (rz/up (rz/find-value zloc rz/next value))))
 
 (defn find-value
   [value]
-  (fn [loc]
-    (rz/find-value loc rz/next value)))
+  (fn [zloc]
+    (rz/find-value zloc rz/next value)))
 
 (defn nav-item->nav-fn
   [nav-item]
@@ -54,16 +54,16 @@
 (defn pred
   "Navigate tree by pred"
   [p]
-  (fn find-path-pred [loc]
-    (rz/find loc
+  (fn find-path-pred [zloc]
+    (rz/find zloc
              rz/next
              (get nav-substitutions p p))))
 
 (defn find-path
-  "navigates to a location using the values in a vector"
-  [loc path]
+  "navigates to a zlocation using the values in a vector"
+  [zloc path]
   (let [path (map (fn [x] (get nav-substitutions x x)) path)]
-    (reduce (fn [loc nav-item]
+    (reduce (fn [zloc nav-item]
               (let [nav-item (if (fn? nav-item)
                                ;; functions are rewrite-clj navigates
                                nav-item
@@ -72,11 +72,11 @@
                                ;; meant to append to a list, vector, or map, and the value is
                                ;; typically a symbol that's used as a kind of anchor
                                (nav-item->nav-fn nav-item))
-                    new-loc  (nav-item loc)]
-                (if (nil? new-loc)
+                    new-zloc  (nav-item zloc)]
+                (if (nil? new-zloc)
                   (reduced {::error nav-item})
-                  new-loc)))
-            loc
+                  new-zloc)))
+            zloc
             path)))
 
 ;;---
@@ -96,17 +96,17 @@
     :set   2
     1))
 
-(defn- loc-column
-  "The 0-based column at which `loc`'s node begins. Computed from the tree using
+(defn- zloc-column
+  "The 0-based column at which `zloc`'s node begins. Computed from the tree using
   whitespace-aware navigation, so it works without position tracking: walk left
   siblings back to the start of the line, then recur up through parents."
-  [loc]
-  (loop [l   (rz/left* loc)
+  [zloc]
+  (loop [l   (rz/left* zloc)
          col 0]
     (cond
       (nil? l)
-      (if-let [parent (rz/up* loc)]
-        (+ (loc-column parent) (delimiter-width (rz/node parent)) col)
+      (if-let [parent (rz/up* zloc)]
+        (+ (zloc-column parent) (delimiter-width (rz/node parent)) col)
         col)
 
       (= :newline (rn/tag (rz/node l)))
@@ -116,9 +116,9 @@
       (recur (rz/left* l) (+ col (node-width (rz/node l)))))))
 
 (defn- child-indent
-  "Spaces needed to align a new line with the first child of collection `loc`."
-  [loc]
-  (inc (loc-column loc)))
+  "Spaces needed to align a new line with the first child of collection `zloc`."
+  [zloc]
+  (inc (zloc-column zloc)))
 
 ;;---
 ;; modification
@@ -128,23 +128,23 @@
   "Appends a newline followed by indentation that aligns the next child with the
   collection's existing contents. Uses the raw `append-child*` for the whitespace
   so no spurious separator is inserted before the newline."
-  ([loc]
-   (-> loc
+  ([zloc]
+   (-> zloc
        (rz/append-child* (rn/newlines 1))
-       (rz/append-child* (rn/spaces (child-indent loc)))))
-  ([loc _]
-   (append-child-newline loc)))
+       (rz/append-child* (rn/spaces (child-indent zloc)))))
+  ([zloc _]
+   (append-child-newline zloc)))
 
 (defn edit-at-path
   [{:keys [modify]} {:keys [handle-error] :as ctx}]
-  (let [{:keys [path edits loc node-to-insert]} modify
-        modify-loc (find-path loc path)]
-    (if-let [error-nav-item (::error modify-loc)]
+  (let [{:keys [path edits zloc node-to-insert]} modify
+        modify-zloc (find-path zloc path)]
+    (if-let [error-nav-item (::error modify-zloc)]
       (handle-error (assoc ctx
                            :event-id :edit-at-path
-                           :error (ex-info "could not navigate to loc to modify" {:nav-item error-nav-item})))
-      (reduce (fn [loc edit] (edit loc node-to-insert))
-              modify-loc
+                           :error (ex-info "could not navigate to zloc to modify" {:nav-item error-nav-item})))
+      (reduce (fn [zloc edit] (edit zloc node-to-insert))
+              modify-zloc
               edits))))
 
 (defn append-to-vector-child [zloc value]
@@ -183,29 +183,29 @@
         (keyword current-ns (name k)))
       k)))
 
-(defn- find-key-loc
-  "Finds the loc of the map key matching keyword `k`, resolving auto-resolving and
+(defn- find-key-zloc
+  "Finds the zloc of the map key matching keyword `k`, resolving auto-resolving and
   aliased namespaced keywords in the source against `k`."
   [zloc k]
   (let [ctx (kondo-keyword-context (rz/root-string zloc))]
     (rz/find (rz/down zloc)
              rz/right
-             (fn [loc]
-               (let [node (rz/node loc)]
+             (fn [zloc]
+               (let [node (rz/node zloc)]
                  (and (rn/keyword-node? node)
                       (= k (resolve-keyword-node node ctx))))))))
 
 (defn upsert-vector-key
   ([k]
-   (fn [loc value]
-     (upsert-vector-key loc k value)))
+   (fn [zloc value]
+     (upsert-vector-key zloc k value)))
   ([k value]
-   (fn [loc _]
-     (upsert-vector-key loc k value)))
+   (fn [zloc _]
+     (upsert-vector-key zloc k value)))
   ([zloc k value]
-   (if-let [key-loc (find-key-loc zloc k)]
+   (if-let [key-zloc (find-key-zloc zloc k)]
      ;; key exists, so navigate to the vector and append to it
-     (-> key-loc
+     (-> key-zloc
          rz/right        ; move to the vector value
          (append-to-vector-child value))
      ;; key missing, so append :x [value]. A non-empty map gets an aligned new
@@ -215,21 +215,21 @@
          (rz/append-child (rn/coerce [value]))))))
 
 (defn node-merge
-  "merges in all nodes from a map into loc, re-indenting continuation lines so they
+  "merges in all nodes from a map into zloc, re-indenting continuation lines so they
   align with the collection's contents. Horizontal separators are left to
   `rz/append-child` rather than copied from the source, so spacing stays single."
-  [loc map-node]
-  (let [indent      (child-indent loc)
-        initial-loc (if (empty? (rz/sexpr loc)) loc (append-child-newline loc))]
-    (reduce (fn [loc child]
+  [zloc map-node]
+  (let [indent      (child-indent zloc)
+        initial-zloc (if (empty? (rz/sexpr zloc)) zloc (append-child-newline zloc))]
+    (reduce (fn [zloc child]
               (case (rn/tag child)
-                :newline    (-> loc
+                :newline    (-> zloc
                                 (rz/append-child* child)
                                 (rz/append-child* (rn/spaces indent)))
                 ;; drop source whitespace/commas; append-child re-inserts separators
-                (:whitespace :comma) loc
-                (rz/append-child loc child)))
-            initial-loc
+                (:whitespace :comma) zloc
+                (rz/append-child zloc child)))
+            initial-zloc
             (rn/children map-node))))
 
 (defn assoc-modify-node-to-insert
