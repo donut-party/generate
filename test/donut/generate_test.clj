@@ -12,15 +12,15 @@
 
 (deftest ->ns-test
   (testing "converts file path separators to dots"
-    (is (= "foo.bar.baz" (dg/->ns "foo/bar/baz"))))
+    (is (= "foo.bar.baz" (dg/file-path->ns "foo/bar/baz"))))
   (testing "converts underscores to hyphens"
-    (is (= "my-ns" (dg/->ns "my_ns"))))
+    (is (= "my-ns" (dg/file-path->ns "my_ns"))))
   (testing "handles combined path and underscores"
-    (is (= "my-app.some-ns.core" (dg/->ns "my_app/some_ns/core"))))
+    (is (= "my-app.some-ns.core" (dg/file-path->ns "my_app/some_ns/core"))))
   (testing "accepts symbols"
-    (is (= "foo.bar" (dg/->ns 'foo/bar))))
+    (is (= "foo.bar" (dg/file-path->ns 'foo/bar))))
   (testing "no-op for already valid namespace"
-    (is (= "foo.bar" (dg/->ns "foo.bar")))))
+    (is (= "foo.bar" (dg/file-path->ns "foo.bar")))))
 
 ;;---
 ;; ->file tests
@@ -28,16 +28,16 @@
 
 (deftest ->file-test
   (testing "converts dots to path separators"
-    (is (= "foo/bar/baz" (dg/->file "foo.bar.baz"))))
+    (is (= "foo/bar/baz" (dg/ns->file-path "foo.bar.baz"))))
   (testing "converts hyphens to underscores"
-    (is (= "my_ns" (dg/->file "my-ns"))))
+    (is (= "my_ns" (dg/ns->file-path "my-ns"))))
   (testing "handles combined namespace and hyphens"
-    (is (= "my_app/some_ns/core" (dg/->file "my-app.some-ns.core"))))
+    (is (= "my_app/some_ns/core" (dg/ns->file-path "my-app.some-ns.core"))))
   (testing "accepts symbols"
-    (is (= "foo/bar" (dg/->file 'foo.bar))))
+    (is (= "foo/bar" (dg/ns->file-path 'foo.bar))))
   (testing "->ns and ->file are inverses"
     (let [path "my_app/some_ns/core"]
-      (is (= path (dg/->file (dg/->ns path)))))))
+      (is (= path (dg/ns->file-pafile-path->nsdg/->ns path)))))))
 
 ;;---
 ;; ->subst-map tests
@@ -272,7 +272,7 @@
 
 (defmethod dg/generator :donut/endpoint
   [_ {:keys [top endpoint-name]}]
-  (let [endpoint-ns (symbol (str (dg/->ns top)
+  (let [endpoint-ns (symbol (str (dg/file-path->ns top)
                                  ".backend.endpoint."
                                  endpoint-name
                                  "-endpoint"))]

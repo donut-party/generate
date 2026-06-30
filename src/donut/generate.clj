@@ -329,17 +329,17 @@
       (catch Exception e
         (handle-error (assoc write-ctx :error e))))))
 
-;;------
-;; generators
-;;------
+;;---
+;; string handling
+;;---
 
-(defn ->ns
+(defn file-path->ns
   "Given a string or symbol, presumably representing a file path, return a string
   that represents the equivalent namespace."
   [f]
   (-> f (str) (str/replace "/" ".") (str/replace "_" "-")))
 
-(defn ->file
+(defn ns->file-path
   "Given a string or symbol, presumably representing a namespace, return a string
   that represents the equivalent file system path."
   [n]
@@ -358,10 +358,24 @@
                             (name k))]
                  (cond-> (assoc m (str "{{" s "}}") (str v))
                    (and (nil? n) (or (string? v) (symbol? v)))
-                   (assoc (str "{{" s "|ns}}")   (->ns   v)
-                          (str "{{" s "|file}}") (->file v)))))
+                   (assoc (str "{{" s "|ns}}")   (file-path->ns   v)
+                          (str "{{" s "|file}}") (ns->file-path v)))))
              {}
              substitutions))
+
+(defrecord Interpolated [content])
+
+(defn interpolated [s] (map->Interpolated {:content s}))
+
+(defn interpolate
+  [s subst-map])
+
+;;------
+;; generators
+;;------
+
+
+
 
 (defn- render-template
   "Given a string and a subst-map hash map, return the string with all
@@ -375,7 +389,7 @@
 (defn- render-destination-namespace
   [{:keys [namespace dir extension]}]
   (str (when dir (str dir "/"))
-       (->file (name namespace))
+       (ns->file-path (name namespace))
        (when extension (str "." extension))))
 
 (defn- render-destination-path
@@ -418,13 +432,13 @@
 
 (defn rendered-point-ns
   [point]
-  (-> point :destination :path strip-extension ->ns))
+  (-> point :destination :path strip-extension file-path->ns))
 
 (defn rendered-point-file-path
   [point]
   (let [path      (-> point :destination :path)
         extension (re-find extension-regex path)]
-    (str (-> path strip-extension ->file)
+    (str (-> path strip-extension ns->file-path)
          extension)))
 
 ;;---

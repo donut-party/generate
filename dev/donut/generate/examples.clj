@@ -14,7 +14,7 @@
 
 (defmethod dg/generator ::add-endpoint
   [_ {:keys [top endpoint-name]}]
-  (let [endpoint-ns (symbol (str (dg/->ns top)
+  (let [endpoint-ns (symbol (str (dg/file-path->ns top)
                                  ".backend.endpoint."
                                  endpoint-name
                                  "-endpoint"))]
