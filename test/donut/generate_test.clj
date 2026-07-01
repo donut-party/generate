@@ -37,7 +37,7 @@
     (is (= "foo/bar" (dg/ns->file-path 'foo.bar))))
   (testing "->ns and ->file are inverses"
     (let [path "my_app/some_ns/core"]
-      (is (= path (dg/ns->file-pafile-path->nsdg/->ns path)))))))
+      (is (= path (dg/ns->file-path (dg/file-path->ns path)))))))
 
 ;;---
 ;; ->subst-map tests
@@ -77,15 +77,15 @@
 (deftest render-point-strings-test
   (testing "substitutes template variables in string values"
     (let [point {:data        {:top "my-app"}
-                 :destination {:path "{{top}}/routes.clj"}
-                 :content     {:template "ns {{top|ns}}"}}
+                 :destination {:path (dg/interpolated "{{top}}/routes.clj")}
+                 :content     {:template (dg/interpolated "ns {{top|ns}}")}}
           result (#'dg/render-point-strings point)]
       (is (= "my-app/routes.clj" (get-in result [:destination :path])))
       (is (= "ns my-app" (get-in result [:content :template])))))
 
   (testing "substitutes multiple variables"
     (let [point  {:data        {:top "myapp" :endpoint-name "users"}
-                  :destination {:path "{{top}}/{{endpoint-name}}.clj"}}
+                  :destination {:path (dg/interpolated "{{top}}/{{endpoint-name}}.clj")}}
           result (#'dg/render-point-strings point)]
       (is (= "myapp/users.clj" (get-in result [:destination :path])))))
 
@@ -142,13 +142,13 @@
 (deftest render-test
   (is (= {:destination {:path "src/my/project/cross/endpoint_routes.cljc"}
           :data        {:top 'my.project}}
-         (-> {:destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
+         (-> {:destination {:path (dg/interpolated "{{top|file}}/cross/endpoint_routes.cljc")
                             :dir  "src"}
               :data        {:top 'my.project}}
              (#'dg/render-point-strings)
              (#'dg/render-destination-values))
 
-         (-> {:destination {:namespace "{{top|ns}}.cross.endpoint-routes"
+         (-> {:destination {:namespace (dg/interpolated "{{top|ns}}.cross.endpoint-routes")
                             :extension "cljc"
                             :dir       "src"}
               :data        {:top 'my.project}}
@@ -195,7 +195,7 @@
            (-> (dg/modify-node {:content {:form :foo}
                                 :modify  {:path  ['routes (dg/pred vector?)]
                                           :edits [rz/append-child]
-                                          :loc   (rz/of-string "(def routes [])")}}
+                                          :zloc  (rz/of-string "(def routes [])")}}
                                {})
                (rz/root)
                (rz/of-node)
@@ -207,7 +207,7 @@
            (-> (dg/modify-node {:content {:form :bar}
                                 :modify  {:path  ['routes (dg/pred vector?)]
                                           :edits [dg/append-child-newline rz/append-child]
-                                          :loc   (rz/of-string "(def routes 
+                                          :zloc  (rz/of-string "(def routes 
   [:foo])")}}
                                {})
                (rz/root-string))))))
@@ -222,7 +222,7 @@
 :bar {:a :b}}"}
                                 :modify  {:path  ['kvs (dg/pred map?)]
                                           :edits [dg/node-merge]
-                                          :loc   (rz/of-string "(def kvs {})")}}
+                                          :zloc  (rz/of-string "(def kvs {})")}}
                                {})
                (rz/root)
                (rz/of-node)
@@ -236,7 +236,7 @@
 :bar {:a :b}}"}
                                 :modify  {:path  ['kvs (dg/pred map?)]
                                           :edits [dg/node-merge]
-                                          :loc   (rz/of-string "(def kvs {:a :b})")}}
+                                          :zloc  (rz/of-string "(def kvs {:a :b})")}}
                                {})
                (rz/root)
                (rz/of-node)
@@ -248,7 +248,7 @@
                                                  :bar {:a :b}}}
                                 :modify  {:path  ['kvs (dg/pred map?)]
                                           :edits [dg/node-merge]
-                                          :loc   (rz/of-string "(def kvs {})")}}
+                                          :zloc  (rz/of-string "(def kvs {})")}}
                                {})
                (rz/root)
                (rz/of-node)
@@ -260,7 +260,7 @@
                                                  :bar {:a :b}}}
                                 :modify  {:path  ['kvs (dg/pred map?)]
                                           :edits [dg/node-merge]
-                                          :loc   (rz/of-string "(def kvs {:a :b})")}}
+                                          :zloc  (rz/of-string "(def kvs {:a :b})")}}
                                {})
                (rz/root)
                (rz/of-node)
@@ -280,17 +280,17 @@
      [ ;; generate the endpoint file
       {:id          ::endpoint-file
        :description "writes endpoint file"
-       :destination {:namespace "{{endpoint-ns}}"
+       :destination {:namespace (dg/interpolated "{{endpoint-ns}}")
                      :extension "clj"
                      :dir       "test-generated-files"}
-       :content     {:template "(ns {{endpoint-ns}})
-;; content goes here"}
+       :content     {:template (dg/interpolated "(ns {{endpoint-ns}})
+;; content goes here")}
        }
 
       ;; update the routes namespaces
       {:id          ::add-route-ns-require
        :description "adds a ns alias to :require"
-       :destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
+       :destination {:path (dg/interpolated "{{top|file}}/cross/endpoint_routes.cljc")
                      :dir  "test-generated-files"}
        :modify      {:path  ['ns (dg/find-parent :require)]
                      :edits [rz/append-child]}
@@ -299,15 +299,15 @@
       ;; update the routes
       {:id          ::add-route
        :description "adds route definition to routes"
-       :destination {:path "{{top|file}}/cross/endpoint_routes.cljc"
+       :destination {:path (dg/interpolated "{{top|file}}/cross/endpoint_routes.cljc")
                      :dir  "test-generated-files"}
        :modify      {:path  ['routes (dg/pred vector?)]
                      :edits [rz/append-child]}
-       :content     {:template "[\"{{route-prefix}}/{{endpoint-name}}\"
+       :content     {:template (dg/interpolated "[\"{{route-prefix}}/{{endpoint-name}}\"
    {:name     {{endpoint-name-kw}}
     :ent-type {{endpoint-name-kw}}
     :id-key   {{endpoint-name-kw}}/id}
-   #?(:clj {{endpoint-name}}/collection-handlers)]"}}]
+   #?(:clj {{endpoint-name}}/collection-handlers)]")}}]
 
      :data-schema [:map
                    [:endpoint-name {:optional? false}]]
@@ -388,7 +388,7 @@
      :destination {:path "deps.edn"}
      :modify      {:path  [:deps (dg/pred map?)]
                    :edits [dg/node-merge]}
-     :content     {:template "{party.donut/bakery {:mvn/version {{gen-lib-version}}}}"}}]
+     :content     {:template (dg/interpolated "{party.donut/bakery {:mvn/version {{gen-lib-version}}}}")}}]
    :data {:gen-lib-version "1.0"}})
 
 ;; cover common patterns
@@ -399,7 +399,7 @@
                                                  :bar {:a :b}}}
                                 :modify  {:path  ['kvs (dg/pred map?)]
                                           :edits [dg/node-merge]
-                                          :loc   (rz/of-string "(def kvs {})")}}
+                                          :zloc  (rz/of-string "(def kvs {})")}}
                                {})
                (rz/root)
                (rz/of-node)
@@ -410,7 +410,7 @@
            (-> (dg/modify-node {:content {:form {:foo {}}}
                                 :modify  {:path  ['kvs (dg/pred map?)]
                                           :edits [dg/node-merge]
-                                          :loc   (rz/of-string "(def kvs {})")}}
+                                          :zloc  (rz/of-string "(def kvs {})")}}
                                {})
                (rz/root)
                (rz/of-node)
@@ -421,7 +421,7 @@
            (-> (dg/modify-node {:content {:form {:bakery {}}}
                                 :modify  {:path  [(dg/find-value :builds) (dg/pred map?)]
                                           :edits [dg/node-merge]
-                                          :loc   (rz/of-string "{:builds {:dev {}}}")}}
+                                          :zloc  (rz/of-string "{:builds {:dev {}}}")}}
                                {})
                (rz/root)
                (rn/sexpr)))))
@@ -438,7 +438,7 @@
   (is (= {:foo [:bar]}
          (-> (dg/modify-node {:modify  {:path  [(dg/pred map?)]
                                         :edits [(dg/upsert-vector-key :foo :bar)]
-                                        :loc   (rz/of-string "{}")}}
+                                        :zloc  (rz/of-string "{}")}}
                              {})
              (rz/root)
              (rn/sexpr))))
@@ -446,7 +446,7 @@
   (is (= {:foo [:bar :baz]}
          (-> (dg/modify-node {:modify  {:path  [(dg/pred map?)]
                                         :edits [(dg/upsert-vector-key :foo :baz)]
-                                        :loc   (rz/of-string "{:foo [:bar]}")}}
+                                        :zloc  (rz/of-string "{:foo [:bar]}")}}
                              {})
              (rz/root)
              (rn/sexpr)))))
@@ -456,7 +456,7 @@
     (is (= "(ns my.app)\n{::foo [:bar]}"
            (-> (dg/modify-node {:modify  {:path  [(dg/pred map?)]
                                           :edits [(dg/upsert-vector-key :my.app/foo :bar)]
-                                          :loc   (rz/of-string "(ns my.app)\n{::foo []}")}}
+                                          :zloc  (rz/of-string "(ns my.app)\n{::foo []}")}}
                                {})
                (rz/root)
                (rn/string)))))
@@ -465,7 +465,7 @@
     (is (= "(ns my.app\n  (:require [some.lib :as lib]))\n{::lib/foo [:bar]}"
            (-> (dg/modify-node {:modify  {:path  [(dg/pred map?)]
                                           :edits [(dg/upsert-vector-key :some.lib/foo :bar)]
-                                          :loc   (rz/of-string "(ns my.app\n  (:require [some.lib :as lib]))\n{::lib/foo []}")}}
+                                          :zloc  (rz/of-string "(ns my.app\n  (:require [some.lib :as lib]))\n{::lib/foo []}")}}
                                {})
                (rz/root)
                (rn/string))))))
@@ -499,7 +499,7 @@
      :destination {:path "package.json"}
      :modify      {:path  []
                    :edits [merge]}
-     :content     {:template "{\"license\": \"{{license}}\"}"}}]
+     :content     {:template (dg/interpolated "{\"license\": \"{{license}}\"}")}}]
    :data {:license "MIT"}})
 
 (deftest json-edit-generation-test

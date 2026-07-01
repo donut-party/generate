@@ -257,7 +257,7 @@
 (defn render-modify-point
   [point {:keys [read-point] :as ctx}]
   (-> point
-      (assoc-in [:modify :loc] (read-point point))
+      (assoc-in [:modify :zloc] (read-point point))
       (modify-node ctx)
       rz/root-string))
 
@@ -366,25 +366,20 @@
 (defrecord Interpolated [content])
 
 (defn interpolated [s] (map->Interpolated {:content s}))
+(defn interpolated? [x] (= Interpolated (type x)))
 
-(defn interpolate
-  [s subst-map])
-
-;;------
-;; generators
-;;------
-
-
-
-
-(defn- render-template
+(defn- interpolate
   "Given a string and a subst-map hash map, return the string with all
   substitutions performed."
   [template subst-map]
   (reduce (fn [s [expression replacement]]
             (str/replace s expression replacement))
-          template
+          (:content template)
           subst-map))
+
+;;------
+;; generators
+;;------
 
 (defn- render-destination-namespace
   [{:keys [namespace dir extension]}]
@@ -398,12 +393,14 @@
        path))
 
 (defn- render-point-strings
-  "performs string substitutions on all string values in :data map"
+  "performs template substitution on every string a generator author marked with
+  `interpolated`, using the point's :data map. Strings that were not marked are
+  left untouched."
   [{:keys [data] :as point}]
   (let [subst-map (->subst-map data)]
     (walk/postwalk (fn [x]
-                     (if (string? x)
-                       (render-template x subst-map)
+                     (if (interpolated? x)
+                       (interpolate x subst-map)
                        x))
                    point)))
 
@@ -445,22 +442,26 @@
 ;; schemas
 ;;---
 
+(def InterpolatableString
+  "a plain string, or a string wrapped with `interpolated` for template substitution"
+  [:or :string [:fn interpolated?]])
+
 (def Content
   [:or
-   [:map [:template :string]]
+   [:map [:template InterpolatableString]]
    [:map [:form :any]]])
 
 (def PathDestination
   [:map
-   [:path :string]
-   [:dir {:optional true} :string]
+   [:path InterpolatableString]
+   [:dir {:optional true} InterpolatableString]
    [:data {:optional true} :map]])
 
 (def NamespaceDestination
   [:map
-   [:namespace [:or :symbol :string :keyword]]
+   [:namespace [:or :symbol :string :keyword [:fn interpolated?]]]
    [:extension :string]
-   [:dir {:optional true} :string]
+   [:dir {:optional true} InterpolatableString]
    [:data {:optional true} :string]])
 
 (def Modify
