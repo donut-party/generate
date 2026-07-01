@@ -1,6 +1,7 @@
 (ns donut.generate-test
   (:require
    [clojure.java.shell :as sh]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [donut.generate :as dg]
    [rewrite-clj.node :as rn]
@@ -523,6 +524,47 @@
                                            {::json-add-script  "{\"scripts\": {\"build\": \"tsc\"}}"
                                             ::json-add-keyword "{\"name\": \"app\", \"keywords\": [\"cli\"]}"
                                             ::json-merge-root  "{\"name\": \"app\"}"})
+                         :write-point     dg/write-point-test})))))
+
+;;---
+;; text edit generation
+;;---
+
+(defmethod dg/generator :donut/text-edits
+  [_ _]
+  {:points
+   [{:id          ::text-append
+     :type        [:text :modify]
+     :description "append content using str"
+     :destination {:path "file.txt"}
+     :modify      {:edits [str]}
+     :content     {:template " world"}}
+
+    {:id          ::text-replace
+     :type        [:text :modify]
+     :description "replace text using a custom fn"
+     :destination {:path "file.txt"}
+     :modify      {:edits [(fn [s node] (str/replace s "old" node))]}
+     :content     {:form "new"}}
+
+    {:id          ::text-interpolated
+     :type        [:text :modify]
+     :description "append with template substitution"
+     :destination {:path "file.txt"}
+     :modify      {:edits [str]}
+     :content     {:template (dg/interpolated "{{suffix}}")}}]
+   :data {:suffix "!"}})
+
+(deftest text-edit-generation-test
+  (testing "appends, replaces, and interpolates in plain-text files"
+    (is (= [{:file-path "file.txt" :contents "hello world"}
+            {:file-path "file.txt" :contents "the new thing"}
+            {:file-path "file.txt" :contents "hello!"}]
+           (dg/generate :donut/text-edits {}
+                        {:read-text-point (dg/read-text-point-test-fn
+                                           {::text-append       "hello"
+                                            ::text-replace      "the old thing"
+                                            ::text-interpolated "hello"})
                          :write-point     dg/write-point-test})))))
 
 ;;---

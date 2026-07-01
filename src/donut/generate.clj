@@ -254,14 +254,14 @@
       assoc-modify-node-to-insert
       (edit-at-path ctx)))
 
-(defn render-modify-point
+(defn render-clojure-modify-point
   [point {:keys [read-point] :as ctx}]
   (-> point
       (assoc-in [:modify :zloc] (read-point point))
       (modify-node ctx)
       rz/root-string))
 
-(defn render-file-point
+(defn render-clojure-file-point
   [{:keys [content] :as _point} _ctx]
   (let [{:keys [template form]} content]
     (if template template (str form))))
@@ -299,6 +299,24 @@
       (edit-json-at-path (:path modify) (:edits modify) (json-node-to-insert point))
       (json/generate-string {:pretty true})))
 
+;;------
+;; text point modification
+;;------
+;; Plain-text files are edited as raw strings. Each edit fn is called as
+;; (edit current-string node-to-insert), where node-to-insert is the content
+;; string resolved from :template or (str :form).
+
+(defn text-node-to-insert
+  [{:keys [content]}]
+  (let [{:keys [template form]} content]
+    (if template template (str form))))
+
+(defn render-text-modify-point
+  [{:keys [modify] :as point} {:keys [read-text-point] :as _ctx}]
+  (reduce (fn [s edit] (edit s (text-node-to-insert point)))
+          (read-text-point point)
+          (:edits modify)))
+
 ;;---
 ;; point rendering
 ;;---
@@ -308,17 +326,22 @@
 (defmethod render-point-contents
   [:clojure :create]
   [point ctx]
-  (render-file-point point ctx))
+  (render-clojure-file-point point ctx))
 
 (defmethod render-point-contents
   [:clojure :modify]
   [point ctx]
-  (render-modify-point point ctx))
+  (render-clojure-modify-point point ctx))
 
 (defmethod render-point-contents
   [:json :modify]
   [point ctx]
   (render-json-modify-point point ctx))
+
+(defmethod render-point-contents
+  [:text :modify]
+  [point ctx]
+  (render-text-modify-point point ctx))
 
 (defn render-point
   [point {:keys [handle-info handle-error] :as ctx}]
@@ -479,7 +502,7 @@
 
 (def Modify
   [:map
-   [:path [:vector :any]]
+   [:path {:optional true} [:vector :any]]
    [:edits [:vector fn?]]])
 
 (def GeneratorPoint
@@ -509,6 +532,10 @@
 (defn read-json-point-file
   [point]
   (-> point point-path slurp (json/parse-string true)))
+
+(defn read-text-point-file
+  [point]
+  (-> point point-path slurp))
 
 (defn write-point-file
   [{:keys [rendered-contents] :as point}]
@@ -540,6 +567,12 @@
         (json/parse-string source true)
         source))))
 
+(defn read-text-point-test-fn
+  "like read-point-test-fn but for plain-text points: maps point ids to strings"
+  [point-source-map]
+  (fn [{:keys [id]}]
+    (get point-source-map id)))
+
 (defn write-point-test
   [{:keys [rendered-contents] :as point}]
   {:file-path (point-path point)
@@ -565,13 +598,14 @@
 
 
 (defn init-ctx
-  [generator-name data {:keys [handle-info handle-error read-point read-json-point write-point]}]
+  [generator-name data {:keys [handle-info handle-error read-point read-json-point read-text-point write-point]}]
   {:generator-name  generator-name
    :data            data
    :handle-info     (or handle-info (constantly nil))
    :handle-error    (or handle-error handle-error-rethrow)
    :read-point      (or read-point read-point-file)
    :read-json-point (or read-json-point read-json-point-file)
+   :read-text-point (or read-text-point read-text-point-file)
    :write-point     (or write-point write-point-file)})
 
 ;;---
