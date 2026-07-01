@@ -299,20 +299,33 @@
       (edit-json-at-path (:path modify) (:edits modify) (json-node-to-insert point))
       (json/generate-string {:pretty true})))
 
-(defn json-point?
-  "true when a point's destination is a .json file"
-  [point]
-  (boolean (some-> point point-path (str/ends-with? ".json"))))
+;;---
+;; point rendering
+;;---
+
+(defmulti render-point-contents (fn [point _ctx] (:type point)))
+
+(defmethod render-point-contents
+  [:clojure :create]
+  [point ctx]
+  (render-file-point point ctx))
+
+(defmethod render-point-contents
+  [:clojure :modify]
+  [point ctx]
+  (render-modify-point point ctx))
+
+(defmethod render-point-contents
+  [:json :modify]
+  [point ctx]
+  (render-json-modify-point point ctx))
 
 (defn render-point
-  [{:keys [modify] :as point} {:keys [handle-info handle-error] :as ctx}]
+  [point {:keys [handle-info handle-error] :as ctx}]
   (let [updated-ctx (assoc ctx :event-id :render-point)]
     (try
       (handle-info updated-ctx)
-      (cond
-        (and modify (json-point? point)) (render-json-modify-point point ctx)
-        modify                           (render-modify-point point ctx)
-        :else                            (render-file-point point ctx))
+      (assoc point :rendered-contents (render-point-contents point ctx))
       (catch Exception e
         (handle-error (assoc updated-ctx :error e))))))
 
@@ -498,11 +511,11 @@
   (-> point point-path slurp (json/parse-string true)))
 
 (defn write-point-file
-  [{:keys [contents] :as point}]
+  [{:keys [rendered-contents] :as point}]
   (let [file-path (point-path point)]
     (when-let [parent (.getParent (java.io.File. file-path))]
       (.mkdirs (java.io.File. parent)))
-    (spit file-path contents)))
+    (spit file-path rendered-contents)))
 
 ;; test read/write
 (defn read-point-test-fn
@@ -528,9 +541,9 @@
         source))))
 
 (defn write-point-test
-  [{:keys [contents] :as point}]
+  [{:keys [rendered-contents] :as point}]
   {:file-path (point-path point)
-   :contents  contents})
+   :contents  rendered-contents})
 
 (defn handle-error-rethrow
   [{:keys [error]}]
@@ -581,9 +594,10 @@
                                      (update :data merge generator-data data)
                                      render-point-strings
                                      render-destination-values)
-                   ctx-w-point   (assoc ctx :point updated-point)
-                   updated-point (assoc updated-point :contents (render-point updated-point ctx-w-point))]
-               (write-point updated-point ctx-w-point)))
+                   ctx-w-point   (assoc ctx :point updated-point)]
+               (-> updated-point
+                   (render-point ctx-w-point)
+                   (write-point ctx-w-point))))
            points))))
 
 (comment

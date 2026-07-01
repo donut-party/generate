@@ -279,6 +279,7 @@
     {:points
      [ ;; generate the endpoint file
       {:id          ::endpoint-file
+       :type        [:clojure :create]
        :description "writes endpoint file"
        :destination {:namespace (dg/interpolated "{{endpoint-ns}}")
                      :extension "clj"
@@ -289,6 +290,7 @@
 
       ;; update the routes namespaces
       {:id          ::add-route-ns-require
+       :type        [:clojure :modify]
        :description "adds a ns alias to :require"
        :destination {:path (dg/interpolated "{{top|file}}/cross/endpoint_routes.cljc")
                      :dir  "test-generated-files"}
@@ -298,6 +300,7 @@
 
       ;; update the routes
       {:id          ::add-route
+       :type        [:clojure :modify]
        :description "adds route definition to routes"
        :destination {:path (dg/interpolated "{{top|file}}/cross/endpoint_routes.cljc")
                      :dir  "test-generated-files"}
@@ -384,6 +387,7 @@
   {:points
    [ ;; generate the endpoint file
     {:id          ::deps.edn
+     :type        [:clojure :modify]
      :description "update deps.edn, add latest party.donut/bakery"
      :destination {:path "deps.edn"}
      :modify      {:path  [:deps (dg/pred map?)]
@@ -479,6 +483,7 @@
   {:points
    [ ;; merge a map into a nested json object
     {:id          ::json-add-script
+     :type        [:json :modify]
      :description "add a test script to package.json"
      :destination {:path "package.json"}
      :modify      {:path  [:scripts]
@@ -487,6 +492,7 @@
 
     ;; append a value to a json array
     {:id          ::json-add-keyword
+     :type        [:json :modify]
      :description "append a keyword to package.json"
      :destination {:path "package.json"}
      :modify      {:path  [:keywords]
@@ -495,6 +501,7 @@
 
     ;; merge top-level keys from a json template
     {:id          ::json-merge-root
+     :type        [:json :modify]
      :description "merge top-level keys into package.json"
      :destination {:path "package.json"}
      :modify      {:path  []
