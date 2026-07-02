@@ -193,63 +193,54 @@
 (deftest modify-node-test
   (testing "works with path and edits"
     (is (= '(def routes [:foo])
-           (-> (dg/modify-node {:content {:form :foo}
-                                :modify  {:path  ['routes (dg/pred vector?)]
-                                          :edits [rz/append-child]
-                                          :zloc  (rz/of-string "(def routes [])")}}
+           (-> (dg/modify-node {:modify {:path  ['routes (dg/pred vector?)]
+                                         :edits [[rz/append-child :foo]]
+                                         :zloc  (rz/of-string "(def routes [])")}}
                                {})
                (rz/root)
                (rz/of-node)
                (rz/sexpr))))
 
-    (is (= "(def routes 
+    (is (= "(def routes
   [:foo
    :bar])"
-           (-> (dg/modify-node {:content {:form :bar}
-                                :modify  {:path  ['routes (dg/pred vector?)]
-                                          :edits [dg/append-child-newline rz/append-child]
-                                          :zloc  (rz/of-string "(def routes 
+           (-> (dg/modify-node {:modify {:path  ['routes (dg/pred vector?)]
+                                         :edits [dg/append-child-newline
+                                                 [rz/append-child :bar]]
+                                         :zloc  (rz/of-string "(def routes
   [:foo])")}}
                                {})
                (rz/root-string))))))
 
 
-;; TODO needs to work with template and with form
 (deftest node-merge-test
-  (testing "works with template"
+  (testing "works with string (parsed as Clojure)"
     (is (= "(def kvs {:foo {:x :y}
           :bar {:a :b}})"
-           (-> (dg/modify-node {:content {:template "{:foo {:x :y}
-:bar {:a :b}}"}
-                                :modify  {:path  ['kvs (dg/pred map?)]
-                                          :edits [dg/node-merge]
-                                          :zloc  (rz/of-string "(def kvs {})")}}
+           (-> (dg/modify-node {:modify {:path  ['kvs (dg/pred map?)]
+                                         :edits [[dg/node-merge "{:foo {:x :y}\n:bar {:a :b}}"]]
+                                         :zloc  (rz/of-string "(def kvs {})")}}
                                {})
                (rz/root)
                (rz/of-node)
                (rz/string))))
 
-
     (is (= "(def kvs {:a :b
           :foo {:x :y}
           :bar {:a :b}})"
-           (-> (dg/modify-node {:content {:template "{:foo {:x :y}
-:bar {:a :b}}"}
-                                :modify  {:path  ['kvs (dg/pred map?)]
-                                          :edits [dg/node-merge]
-                                          :zloc  (rz/of-string "(def kvs {:a :b})")}}
+           (-> (dg/modify-node {:modify {:path  ['kvs (dg/pred map?)]
+                                         :edits [[dg/node-merge "{:foo {:x :y}\n:bar {:a :b}}"]]
+                                         :zloc  (rz/of-string "(def kvs {:a :b})")}}
                                {})
                (rz/root)
                (rz/of-node)
                (rz/string)))))
 
-  (testing "works with form"
+  (testing "works with map (coerced)"
     (is (= "(def kvs {:foo {:x :y} :bar {:a :b}})"
-           (-> (dg/modify-node {:content {:form {:foo {:x :y}
-                                                 :bar {:a :b}}}
-                                :modify  {:path  ['kvs (dg/pred map?)]
-                                          :edits [dg/node-merge]
-                                          :zloc  (rz/of-string "(def kvs {})")}}
+           (-> (dg/modify-node {:modify {:path  ['kvs (dg/pred map?)]
+                                         :edits [[dg/node-merge {:foo {:x :y} :bar {:a :b}}]]
+                                         :zloc  (rz/of-string "(def kvs {})")}}
                                {})
                (rz/root)
                (rz/of-node)
@@ -257,11 +248,9 @@
 
     (is (= "(def kvs {:a :b
           :foo {:x :y} :bar {:a :b}})"
-           (-> (dg/modify-node {:content {:form {:foo {:x :y}
-                                                 :bar {:a :b}}}
-                                :modify  {:path  ['kvs (dg/pred map?)]
-                                          :edits [dg/node-merge]
-                                          :zloc  (rz/of-string "(def kvs {:a :b})")}}
+           (-> (dg/modify-node {:modify {:path  ['kvs (dg/pred map?)]
+                                         :edits [[dg/node-merge {:foo {:x :y} :bar {:a :b}}]]
+                                         :zloc  (rz/of-string "(def kvs {:a :b})")}}
                                {})
                (rz/root)
                (rz/of-node)
@@ -296,8 +285,7 @@
        :destination {:path (dg/interpolated "{{top|file}}/cross/endpoint_routes.cljc")
                      :dir  "test-generated-files"}
        :modify      {:path  ['ns (dg/find-parent :require)]
-                     :edits [rz/append-child]}
-       :content     {:form [endpoint-ns :as endpoint-name]}}
+                     :edits [[rz/append-child [endpoint-ns :as endpoint-name]]]}}
 
       ;; update the routes
       {:id          ::add-route
@@ -306,12 +294,11 @@
        :destination {:path (dg/interpolated "{{top|file}}/cross/endpoint_routes.cljc")
                      :dir  "test-generated-files"}
        :modify      {:path  ['routes (dg/pred vector?)]
-                     :edits [rz/append-child]}
-       :content     {:template (dg/interpolated "[\"{{route-prefix}}/{{endpoint-name}}\"
+                     :edits [[dg/append-string-as-form (dg/interpolated "[\"{{route-prefix}}/{{endpoint-name}}\"
    {:name     {{endpoint-name-kw}}
     :ent-type {{endpoint-name-kw}}
     :id-key   {{endpoint-name-kw}}/id}
-   #?(:clj {{endpoint-name}}/collection-handlers)]")}}]
+   #?(:clj {{endpoint-name}}/collection-handlers)]")]]}}]
 
      :data-schema [:map
                    [:endpoint-name {:optional? false}]]
@@ -392,41 +379,36 @@
      :description "update deps.edn, add latest party.donut/bakery"
      :destination {:path "deps.edn"}
      :modify      {:path  [:deps (dg/pred map?)]
-                   :edits [dg/node-merge]}
-     :content     {:template (dg/interpolated "{party.donut/bakery {:mvn/version {{gen-lib-version}}}}")}}]
+                   :edits [[dg/node-merge (dg/interpolated "{party.donut/bakery {:mvn/version {{gen-lib-version}}}}")]]}}]
    :data {:gen-lib-version "1.0"}})
 
 ;; cover common patterns
 (deftest patterns-test
-  (testing "works with form"
+  (testing "works with map"
     (is (= "(def kvs {:foo {:x :y} :bar {:a :b}})"
-           (-> (dg/modify-node {:content {:form {:foo {:x :y}
-                                                 :bar {:a :b}}}
-                                :modify  {:path  ['kvs (dg/pred map?)]
-                                          :edits [dg/node-merge]
-                                          :zloc  (rz/of-string "(def kvs {})")}}
+           (-> (dg/modify-node {:modify {:path  ['kvs (dg/pred map?)]
+                                         :edits [[dg/node-merge {:foo {:x :y} :bar {:a :b}}]]
+                                         :zloc  (rz/of-string "(def kvs {})")}}
                                {})
                (rz/root)
                (rz/of-node)
                (rz/string)))))
 
-  (testing "works with form"
+  (testing "works with nested empty map"
     (is (= "(def kvs {:foo {}})"
-           (-> (dg/modify-node {:content {:form {:foo {}}}
-                                :modify  {:path  ['kvs (dg/pred map?)]
-                                          :edits [dg/node-merge]
-                                          :zloc  (rz/of-string "(def kvs {})")}}
+           (-> (dg/modify-node {:modify {:path  ['kvs (dg/pred map?)]
+                                         :edits [[dg/node-merge {:foo {}}]]
+                                         :zloc  (rz/of-string "(def kvs {})")}}
                                {})
                (rz/root)
                (rz/of-node)
                (rz/string)))))
-  
+
   (testing "works with path and edits"
     (is (= {:builds {:dev {} :bakery {}}}
-           (-> (dg/modify-node {:content {:form {:bakery {}}}
-                                :modify  {:path  [(dg/find-value :builds) (dg/pred map?)]
-                                          :edits [dg/node-merge]
-                                          :zloc  (rz/of-string "{:builds {:dev {}}}")}}
+           (-> (dg/modify-node {:modify {:path  [(dg/find-value :builds) (dg/pred map?)]
+                                         :edits [[dg/node-merge {:bakery {}}]]
+                                         :zloc  (rz/of-string "{:builds {:dev {}}}")}}
                                {})
                (rz/root)
                (rn/sexpr)))))
@@ -441,17 +423,17 @@
 
 (deftest upsert-vector-key-test
   (is (= {:foo [:bar]}
-         (-> (dg/modify-node {:modify  {:path  [(dg/pred map?)]
-                                        :edits [(dg/upsert-vector-key :foo :bar)]
-                                        :zloc  (rz/of-string "{}")}}
+         (-> (dg/modify-node {:modify {:path  [(dg/pred map?)]
+                                       :edits [[dg/upsert-vector-key :foo :bar]]
+                                       :zloc  (rz/of-string "{}")}}
                              {})
              (rz/root)
              (rn/sexpr))))
 
   (is (= {:foo [:bar :baz]}
-         (-> (dg/modify-node {:modify  {:path  [(dg/pred map?)]
-                                        :edits [(dg/upsert-vector-key :foo :baz)]
-                                        :zloc  (rz/of-string "{:foo [:bar]}")}}
+         (-> (dg/modify-node {:modify {:path  [(dg/pred map?)]
+                                       :edits [[dg/upsert-vector-key :foo :baz]]
+                                       :zloc  (rz/of-string "{:foo [:bar]}")}}
                              {})
              (rz/root)
              (rn/sexpr)))))
@@ -459,18 +441,18 @@
 (deftest upsert-vector-key-alias-test
   (testing "resolves auto-resolving current-ns keywords via clj-kondo"
     (is (= "(ns my.app)\n{::foo [:bar]}"
-           (-> (dg/modify-node {:modify  {:path  [(dg/pred map?)]
-                                          :edits [(dg/upsert-vector-key :my.app/foo :bar)]
-                                          :zloc  (rz/of-string "(ns my.app)\n{::foo []}")}}
+           (-> (dg/modify-node {:modify {:path  [(dg/pred map?)]
+                                         :edits [[dg/upsert-vector-key :my.app/foo :bar]]
+                                         :zloc  (rz/of-string "(ns my.app)\n{::foo []}")}}
                                {})
                (rz/root)
                (rn/string)))))
 
   (testing "resolves aliased namespaced keywords via clj-kondo"
     (is (= "(ns my.app\n  (:require [some.lib :as lib]))\n{::lib/foo [:bar]}"
-           (-> (dg/modify-node {:modify  {:path  [(dg/pred map?)]
-                                          :edits [(dg/upsert-vector-key :some.lib/foo :bar)]
-                                          :zloc  (rz/of-string "(ns my.app\n  (:require [some.lib :as lib]))\n{::lib/foo []}")}}
+           (-> (dg/modify-node {:modify {:path  [(dg/pred map?)]
+                                         :edits [[dg/upsert-vector-key :some.lib/foo :bar]]
+                                         :zloc  (rz/of-string "(ns my.app\n  (:require [some.lib :as lib]))\n{::lib/foo []}")}}
                                {})
                (rz/root)
                (rn/string))))))
@@ -488,8 +470,7 @@
      :description "add a test script to package.json"
      :destination {:path "package.json"}
      :modify      {:path  [:scripts]
-                   :edits [merge]}
-     :content     {:form {:test "jest"}}}
+                   :edits [[merge {:test "jest"}]]}}
 
     ;; append a value to a json array
     {:id          ::json-add-keyword
@@ -497,17 +478,15 @@
      :description "append a keyword to package.json"
      :destination {:path "package.json"}
      :modify      {:path  [:keywords]
-                   :edits [conj]}
-     :content     {:form "donut"}}
+                   :edits [[conj "donut"]]}}
 
-    ;; merge top-level keys from a json template
+    ;; merge top-level keys with interpolated value
     {:id          ::json-merge-root
      :type        [:json :modify]
      :description "merge top-level keys into package.json"
      :destination {:path "package.json"}
      :modify      {:path  []
-                   :edits [merge]}
-     :content     {:template (dg/interpolated "{\"license\": \"{{license}}\"}")}}]
+                   :edits [[merge {:license (dg/interpolated "{{license}}")}]]}}]
    :data {:license "MIT"}})
 
 (deftest json-edit-generation-test
@@ -537,22 +516,20 @@
      :type        [:text :modify]
      :description "append content using str"
      :destination {:path "file.txt"}
-     :modify      {:edits [str]}
-     :content     {:template " world"}}
+     :modify      {:edits [[str " world"]]}}
 
     {:id          ::text-replace
      :type        [:text :modify]
-     :description "replace text using a custom fn"
+     :description "replace text using str/replace"
      :destination {:path "file.txt"}
-     :modify      {:edits [(fn [s node] (str/replace s "old" node))]}
-     :content     {:form "new"}}
+     :modify      {:edits [[str/replace "old" "new"]]}}
 
     {:id          ::text-interpolated
      :type        [:text :modify]
      :description "append with template substitution"
      :destination {:path "file.txt"}
-     :modify      {:edits [str]}
-     :content     {:template (dg/interpolated "{{suffix}}")}}]
+     :modify      {:edits [[str (dg/interpolated "{{suffix}}")]]}
+     }]
    :data {:suffix "!"}})
 
 (deftest text-edit-generation-test

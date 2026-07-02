@@ -172,24 +172,35 @@
   "Appends a newline followed by indentation that aligns the next child with the
   collection's existing contents. Uses the raw `append-child*` for the whitespace
   so no spurious separator is inserted before the newline."
-  ([zloc]
-   (-> zloc
-       (rz/append-child* (rn/newlines 1))
-       (rz/append-child* (rn/spaces (child-indent zloc)))))
-  ([zloc _]
-   (append-child-newline zloc)))
+  [zloc]
+  (-> zloc
+      (rz/append-child* (rn/newlines 1))
+      (rz/append-child* (rn/spaces (child-indent zloc)))))
+
+(defn apply-edit
+  "Applies one edit step to value.
+  - plain fn:    (f value)
+  - [f & args]:  (apply f value args)"
+  [value edit]
+  (if (vector? edit)
+    (let [[f & args] edit]
+      (apply f value args))
+    (edit value)))
+
+(defn append-string-as-form
+  "Parses s as a Clojure form and appends it as a child of zloc."
+  [zloc s]
+  (rz/append-child zloc (rz/node (rz/of-string s))))
 
 (defn edit-at-path
   [{:keys [modify]} {:keys [handle-error] :as ctx}]
-  (let [{:keys [path edits zloc node-to-insert]} modify
+  (let [{:keys [path edits zloc]} modify
         modify-zloc (find-path zloc path)]
     (if-let [error-nav-item (::error modify-zloc)]
       (handle-error (assoc ctx
                            :event-id :edit-at-path
                            :error (ex-info "could not navigate to zloc to modify" {:nav-item error-nav-item})))
-      (reduce (fn [zloc edit] (edit zloc node-to-insert))
-              modify-zloc
-              edits))))
+      (reduce apply-edit modify-zloc edits))))
 
 (defn append-to-vector-child [zloc value]
   ;; append-child handles the separating whitespace: a space before the value when
@@ -199,30 +210,29 @@
 (defn upsert-vector-key
   "if key does not exist in map, adds it with value of `[value]`
   if key does exist, adds `value` to it"
-  ([k]
-   (fn [zloc value]
-     (upsert-vector-key zloc k value)))
-  ([k value]
-   (fn [zloc _]
-     (upsert-vector-key zloc k value)))
-  ([zloc k value]
-   (if-let [key-zloc (find-keyword zloc k)]
-     ;; key exists, so navigate to the vector and append to it
-     (-> key-zloc
-         rz/right        ; move to the vector value
-         (append-to-vector-child value))
-     ;; key missing, so append :x [value]. A non-empty map gets an aligned new
-     ;; line first; append-child supplies the space between key and value
-     (-> (if (empty? (rz/sexpr zloc)) zloc (append-child-newline zloc))
-         (rz/append-child (rn/coerce k))
-         (rz/append-child (rn/coerce [value]))))))
+  [zloc k value]
+  (if-let [key-zloc (find-keyword zloc k)]
+    ;; key exists, so navigate to the vector and append to it
+    (-> key-zloc
+        rz/right        ; move to the vector value
+        (append-to-vector-child value))
+    ;; key missing, so append :x [value]. A non-empty map gets an aligned new
+    ;; line first; append-child supplies the space between key and value
+    (-> (if (empty? (rz/sexpr zloc)) zloc (append-child-newline zloc))
+        (rz/append-child (rn/coerce k))
+        (rz/append-child (rn/coerce [value])))))
 
 (defn node-merge
   "merges in all nodes from a map into zloc, re-indenting continuation lines so they
   align with the collection's contents. Horizontal separators are left to
-  `rz/append-child` rather than copied from the source, so spacing stays single."
+  `rz/append-child` rather than copied from the source, so spacing stays single.
+  Accepts a rewrite-clj node, a Clojure map (coerced), or a string (parsed as Clojure)."
   [zloc map-node]
-  (let [indent      (child-indent zloc)
+  (let [map-node     (cond
+                       (string? map-node) (rz/node (rz/of-string map-node))
+                       (map? map-node)    (rn/coerce map-node)
+                       :else              map-node)
+        indent       (child-indent zloc)
         initial-zloc (if (empty? (rz/sexpr zloc)) zloc (append-child-newline zloc))]
     (reduce (fn [zloc child]
               (case (rn/tag child)
@@ -239,20 +249,10 @@
 ;; point string rendering
 ;;------
 
-(defn assoc-modify-node-to-insert
-  [{:keys [content] :as point}]
-  (let [{:keys [template form]} content
-        node-to-insert          (if template
-                                  (rz/node (rz/of-string template))
-                                  (rn/coerce form))]
-    (assoc-in point [:modify :node-to-insert] node-to-insert)))
-
 (defn modify-node
   "updates a node with rewrite-clj using point"
   [point ctx]
-  (-> point
-      assoc-modify-node-to-insert
-      (edit-at-path ctx)))
+  (edit-at-path point ctx))
 
 (defn render-clojure-modify-point
   [point {:keys [read-point] :as ctx}]
@@ -269,26 +269,17 @@
 ;;------
 ;; json point modification
 ;;------
-;; Clojure files are edited as rewrite-clj trees. JSON files are edited as
-;; ordinary parsed data: cheshire turns the file into Clojure maps/vectors, the
-;; point's :edits transform the data at :path, and cheshire renders it back out.
-;; Since the data is plain Clojure, the :edits are plain data fns like `merge`,
-;; `conj`, and `assoc`. Each one is called as (edit value-at-path node-to-insert).
-
-(defn json-node-to-insert
-  "Resolves a point's :content to the data inserted into the JSON: a :template is
-  parsed as JSON, a :form is used as-is."
-  [{:keys [content]}]
-  (let [{:keys [template form]} content]
-    (if template
-      (json/parse-string template true)
-      form)))
+;; JSON files are edited as ordinary parsed data: cheshire turns the file into
+;; Clojure maps/vectors, the point's :edits transform the data at :path, and
+;; cheshire renders it back out. Since the data is plain Clojure, the :edits are
+;; plain data fns like `merge`, `conj`, and `assoc`, with any extra arguments
+;; embedded directly in the edit vector: [merge {:key "val"}].
 
 (defn edit-json-at-path
-  "Applies `edits` to the value found at `path` within parsed JSON `data`, threading
-  `node` through each edit. An empty path edits the whole document."
-  [data path edits node]
-  (let [apply-edits (fn [value] (reduce (fn [value edit] (edit value node)) value edits))]
+  "Applies `edits` to the value found at `path` within parsed JSON `data`.
+  An empty path edits the whole document."
+  [data path edits]
+  (let [apply-edits (fn [value] (reduce apply-edit value edits))]
     (if (seq path)
       (update-in data path apply-edits)
       (apply-edits data))))
@@ -296,26 +287,18 @@
 (defn render-json-modify-point
   [{:keys [modify] :as point} {:keys [read-json-point] :as _ctx}]
   (-> (read-json-point point)
-      (edit-json-at-path (:path modify) (:edits modify) (json-node-to-insert point))
+      (edit-json-at-path (:path modify) (:edits modify))
       (json/generate-string {:pretty true})))
 
 ;;------
 ;; text point modification
 ;;------
-;; Plain-text files are edited as raw strings. Each edit fn is called as
-;; (edit current-string node-to-insert), where node-to-insert is the content
-;; string resolved from :template or (str :form).
-
-(defn text-node-to-insert
-  [{:keys [content]}]
-  (let [{:keys [template form]} content]
-    (if template template (str form))))
+;; Plain-text files are edited as raw strings. Edit args are embedded directly
+;; in the edit vector: [str " appended"], [str/replace "old" "new"].
 
 (defn render-text-modify-point
   [{:keys [modify] :as point} {:keys [read-text-point] :as _ctx}]
-  (reduce (fn [s edit] (edit s (text-node-to-insert point)))
-          (read-text-point point)
-          (:edits modify)))
+  (reduce apply-edit (read-text-point point) (:edits modify)))
 
 ;;---
 ;; point rendering
@@ -503,7 +486,7 @@
 (def Modify
   [:map
    [:path {:optional true} [:vector :any]]
-   [:edits [:vector fn?]]])
+   [:edits [:vector [:or fn? [:vector :any]]]]])
 
 (def GeneratorPoint
   [:map
@@ -511,7 +494,7 @@
    [:description {:optional false} :string]
    [:destination {:optional false} [:or PathDestination NamespaceDestination]]
    [:modify      {:optional true}  Modify]
-   [:content     Content]
+   [:content     {:optional true} Content]
    [:data        {:optional true} [:map-of :keyword :any]]])
 
 (def Generator
