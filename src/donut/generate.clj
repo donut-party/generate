@@ -3,6 +3,7 @@
   (:require
    [cheshire.core :as json]
    [clj-kondo.core :as clj-kondo]
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.tools.logging :as log]
    [clojure.walk :as walk]
@@ -386,6 +387,12 @@
 
 (defn interpolated [s] (map->Interpolated {:content s}))
 (defn interpolated? [x] (= Interpolated (type x)))
+
+(defn clj-template-resource
+  "Loads a classpath resource at `path`, slurps it, and wraps it with `interpolated`
+  so template substitution is applied when the point is rendered."
+  [path]
+  (-> path io/resource slurp interpolated))
 
 (defn- interpolate
   "Given a string and a subst-map hash map, return the string with all
