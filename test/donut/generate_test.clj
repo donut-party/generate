@@ -376,10 +376,10 @@
    [ ;; generate the endpoint file
     {:id          ::deps.edn
      :type        [:clojure :modify]
-     :description "update deps.edn, add latest party.donut/bakery"
+     :description "update deps.edn, add latest party.donut/devtools"
      :destination {:path "deps.edn"}
      :modify      {:path  [:deps (dg/pred map?)]
-                   :edits [[dg/node-merge (dg/interpolated "{party.donut/bakery {:mvn/version {{gen-lib-version}}}}")]]}}]
+                   :edits [[dg/node-merge (dg/interpolated "{party.donut/devtools {:mvn/version {{gen-lib-version}}}}")]]}}]
    :data {:gen-lib-version "1.0"}})
 
 ;; cover common patterns
@@ -405,16 +405,16 @@
                (rz/string)))))
 
   (testing "works with path and edits"
-    (is (= {:builds {:dev {} :bakery {}}}
+    (is (= {:builds {:dev {} :devtools {}}}
            (-> (dg/modify-node {:modify {:path  [(dg/find-value :builds) (dg/pred map?)]
-                                         :edits [[dg/node-merge {:bakery {}}]]
+                                         :edits [[dg/node-merge {:devtools {}}]]
                                          :zloc  (rz/of-string "{:builds {:dev {}}}")}}
                                {})
                (rz/root)
                (rn/sexpr)))))
 
   (testing "works with vars in string template"
-    (is (= [{:contents "{:deps {party.donut/bakery {:mvn/version 1.0}}}",
+    (is (= [{:contents "{:deps {party.donut/devtools {:mvn/version 1.0}}}",
              :file-path "deps.edn"}]
            (dg/generate :donut/deps-edn
                         {}
