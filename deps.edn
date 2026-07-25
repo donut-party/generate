@@ -6,6 +6,11 @@
          party.donut/sugar         {:mvn/version "0.0.22"}
          rewrite-clj/rewrite-clj   {:mvn/version "1.2.54"}}
 
+ :donut/lib {:name           party.donut/generate
+             :description    "generators for clojure"
+             :github         "donut-party/generate"
+             :version-prefix "1.0"}
+
  :aliases
  {:dev
   {:extra-paths ["dev" "dev-resources"]
@@ -19,6 +24,6 @@
    :exec-fn     cognitect.test-runner.api/test}
 
   :build
-  {:deps       {io.github.clojure/tools.build {:mvn/version "0.9.6"}
-                slipset/deps-deploy           {:mvn/version "0.2.1"}}
-   :ns-default build}}}
+  {:deps       {io.github.donut-party/framework-build
+                {:git/sha "912e0b0ffc914cf1b5824650268307062d92e40c"}}
+   :ns-default donut.build}}}
